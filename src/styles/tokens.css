@@ -1,0 +1,55 @@
+:root {
+  color-scheme: dark;
+  /* Brand palette */
+  --navy-950: #050818;
+  --navy-900: #0a0e27;
+  --navy-800: #11173a;
+  --navy-700: #1a2150;
+  --purple-700: #2a1b5e;
+  --purple-500: #6d5dfc;
+  --blue-500: #3b6cff;
+  --blue-400: #5b8aff;
+  --cyan-400: #22d3ee;
+  --cyan-300: #67e8f9;
+
+  /* Text */
+  --text-100: #f5f7ff;
+  --text-300: #c3c9e6;
+  --text-500: #8a93bd;
+
+  /* Surfaces */
+  --glass-bg: rgba(255, 255, 255, 0.05);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --card-bg: rgba(17, 23, 58, 0.72);
+
+  /* Gradients */
+  --grad-brand: linear-gradient(135deg, var(--cyan-400) 0%, var(--blue-500) 45%, var(--purple-500) 100%);
+  --grad-text: linear-gradient(120deg, #ffffff 10%, var(--cyan-300) 55%, #a99bff 100%);
+
+  /* Shape + depth */
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-pill: 999px;
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 20px 50px -20px rgba(0, 0, 0, 0.6);
+  --shadow-glow: 0 10px 40px -10px rgba(59, 108, 255, 0.6);
+
+  /* Spacing scale (8px base) */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+  --s-8: 64px;
+  --s-9: 96px;
+  --s-10: 128px;
+
+  /* Type */
+  --font-display: "Sora", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --container: 1200px;
+}
