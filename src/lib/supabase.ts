@@ -6,9 +6,15 @@ import { createClient } from "@supabase/supabase-js";
  */
 const cleanUrl = (raw?: string) => {
   if (!raw) return undefined;
-  const m = raw.match(/https:\/\/[a-z0-9-]+\.supabase\.(co|in)/i) ?? raw.match(/https?:\/\/[^\s`'"<>]+/i);
-  return m ? m[0].replace(/[/.,;]+$/, "") : undefined;
+  const trimmed = raw.trim();
+  const m = trimmed.match(/https:\/\/[a-z0-9-]+\.supabase\.(co|in)/i) ?? trimmed.match(/https?:\/\/[^\s`'"<>]+/i);
+  if (m) return m[0].replace(/[/.,;]+$/, "");
+  // Fallback support for bare project refs or hosts without a scheme
+  if (/^https?:\/\//.test(trimmed)) return trimmed;
+  if (trimmed.includes(".")) return `https://${trimmed}`;
+  return trimmed ? `https://${trimmed}.supabase.co` : undefined;
 };
+
 const cleanKey = (raw?: string) => {
   if (!raw) return undefined;
   const m = raw.match(/sb_publishable_[A-Za-z0-9_-]+/) ?? raw.match(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/);
