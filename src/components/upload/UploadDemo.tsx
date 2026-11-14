@@ -5,7 +5,7 @@ type Category = "image" | "video" | "document";
 
 const CATS: Record<Category, { label: string; exts: string[]; mimes: string[]; maxMB: number; hint: string }> = {
   image: { label: "Images", exts: ["jpg", "jpeg", "png", "webp"], mimes: ["image/jpeg", "image/png", "image/webp"], maxMB: 20, hint: "JPG, JPEG, PNG, WEBP" },
-  video: { label: "Videos", exts: ["mp4", "mov", "webm"], mimes: ["video/mp4", "video/quicktime", "video/webm"], maxMB: 200, hint: "MP4, MOV, WEBM" },
+  video: { label: "Videos", exts: ["mp4", "mov", "webm"], mimes: ["video/mp4", "video/quicktime", "video/webm"], maxMB: 50, hint: "MP4, MOV, WEBM" },
   document: {
     label: "Documents",
     exts: ["pdf", "docx", "pptx"],

@@ -1,0 +1,11 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Set these two in Netlify: Site configuration -> Environment variables (they are public values, never a service_role key)
+#   VITE_SUPABASE_URL
+#   VITE_SUPABASE_PUBLISHABLE_KEY
+# Security headers and the SPA fallback live in public/_headers and public/_redirects.
