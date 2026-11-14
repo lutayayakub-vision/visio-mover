@@ -1,6 +1,11 @@
 import { createClient } from "@supabase/supabase-js";
 
-const envUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const rawUrl = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim();
+// Accept a bare project ref (e.g. "abcd1234") or a host without a scheme, and turn it into a full URL.
+const envUrl = !rawUrl ? undefined
+  : /^https?:\/\//.test(rawUrl) ? rawUrl
+  : rawUrl.includes(".") ? `https://${rawUrl}`
+  : `https://${rawUrl}.supabase.co`;
 const envKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
 
 /** False when the Supabase env vars were not present at build time. Public pages still render; auth calls will fail. */
