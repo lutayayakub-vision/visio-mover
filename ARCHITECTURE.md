@@ -112,9 +112,9 @@ src/
 
 | # | Stage | Status |
 |---|---|---|
-| 1 | Frontend + landing page | **Built in this delivery** |
-| 2 | Auth + dashboard shell | Planned |
-| 3 | Database + private storage | Planned |
+| 1 | Frontend + landing page | Built |
+| 2 | Auth + dashboard shell | Built |
+| 3 | Private upload workspace (storage + files table + RLS) | **Built** (live Supabase upload/download not yet exercised in a browser) |
 | 4 | Image processing (LaMa) | Planned |
 | 5 | Video processing | Planned |
 | 6 | Document processing | Planned |

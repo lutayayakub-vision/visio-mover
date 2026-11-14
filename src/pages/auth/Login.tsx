@@ -10,7 +10,7 @@ import { isValidEmail, normalizeEmail } from "../../auth/validation";
 import { friendlyAuthError } from "../../auth/errors";
 
 const GOOGLE_ENABLED = import.meta.env.VITE_ENABLE_GOOGLE === "true";
-const APP_PATHS = ["/dashboard", "/image-editor", "/video-editor", "/document-editor", "/projects", "/settings"];
+const APP_PATHS = ["/dashboard", "/workspace", "/image-editor", "/video-editor", "/document-editor", "/projects", "/settings"];
 
 export default function Login() {
   const nav = useNavigate();

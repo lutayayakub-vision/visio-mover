@@ -15,6 +15,7 @@ import AuthCallback from "./pages/auth/AuthCallback";
 import Dashboard from "./pages/app/Dashboard";
 import Projects from "./pages/app/Projects";
 import Settings from "./pages/app/Settings";
+import Workspace from "./pages/app/Workspace";
 import EditorPlaceholder from "./pages/app/EditorPlaceholder";
 
 function ScrollManager() {
@@ -66,6 +67,7 @@ export default function App() {
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/workspace" element={<Workspace />} />
             <Route path="/image-editor" element={<EditorPlaceholder title="Image Editor" stage="Stage 4" blurb="Remove unwanted marks from images you own or are authorized to edit." />} />
             <Route path="/video-editor" element={<EditorPlaceholder title="Video Editor" stage="Stage 5" blurb="Select, track and reconstruct regions across video frames." />} />
             <Route path="/document-editor" element={<EditorPlaceholder title="Document Editor" stage="Stage 6" blurb="Clean PDF, DOCX and PPTX files while preserving their layout." />} />

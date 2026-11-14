@@ -7,6 +7,7 @@ import { useToast } from "../ui/Toast";
 
 const nav = [
   { to: "/dashboard", label: "Dashboard", icon: "M4 13h7V4H4zM13 20h7v-9h-7zM13 4v5h7V4zM4 20h7v-5H4z" },
+  { to: "/workspace", label: "Upload Workspace", icon: "M12 16V4M7 9l5-5 5 5M4 20h16" },
   { to: "/image-editor", label: "Image Editor", icon: "M3 4h18v16H3zM3 16l5-5 4 4 3-3 6 6M9 9a1 1 0 1 0 0 .01" },
   { to: "/video-editor", label: "Video Editor", icon: "M3 6h12v12H3zM15 10l6-3v10l-6-3" },
   { to: "/document-editor", label: "Document Editor", icon: "M7 3h8l4 4v14H7zM15 3v4h4M10 12h6M10 16h6" },
