@@ -1,12 +1,28 @@
 import { createClient } from "@supabase/supabase-js";
 
-const rawUrl = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim();
-// Accept a bare project ref (e.g. "abcd1234") or a host without a scheme, and turn it into a full URL.
-const envUrl = !rawUrl ? undefined
-  : /^https?:\/\//.test(rawUrl) ? rawUrl
-  : rawUrl.includes(".") ? `https://${rawUrl}`
-  : `https://${rawUrl}.supabase.co`;
-const envKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
+/**
+ * Env values are sometimes pasted with surrounding text, quotes or backticks
+ * (e.g. "Your Supabase project URL is `https://abc.supabase.co`."). Pull out just the URL / key.
+ */
+const cleanUrl = (raw?: string) => {
+  if (!raw) return undefined;
+  const trimmed = raw.trim();
+  const m = trimmed.match(/https:\/\/[a-z0-9-]+\.supabase\.(co|in)/i) ?? trimmed.match(/https?:\/\/[^\s`'"<>]+/i);
+  if (m) return m[0].replace(/[/.,;]+$/, "");
+  // Fallback support for bare project refs or hosts without a scheme
+  if (/^https?:\/\//.test(trimmed)) return trimmed;
+  if (trimmed.includes(".")) return `https://${trimmed}`;
+  return trimmed ? `https://${trimmed}.supabase.co` : undefined;
+};
+
+const cleanKey = (raw?: string) => {
+  if (!raw) return undefined;
+  const m = raw.match(/sb_publishable_[A-Za-z0-9_-]+/) ?? raw.match(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/);
+  return m ? m[0] : raw.trim().replace(/^[`'"]+|[`'"]+$/g, "") || undefined;
+};
+
+const envUrl = cleanUrl(import.meta.env.VITE_SUPABASE_URL as string | undefined);
+const envKey = cleanKey(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined);
 
 /** False when the Supabase env vars were not present at build time. Public pages still render; auth calls will fail. */
 export const supabaseConfigured = Boolean(envUrl && envKey);
