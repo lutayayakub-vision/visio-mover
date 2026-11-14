@@ -1,7 +1,22 @@
 import { createClient } from "@supabase/supabase-js";
 
-const envUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const envKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
+/**
+ * Env values are sometimes pasted with surrounding text, quotes or backticks
+ * (e.g. "Your Supabase project URL is `https://abc.supabase.co`."). Pull out just the URL / key.
+ */
+const cleanUrl = (raw?: string) => {
+  if (!raw) return undefined;
+  const m = raw.match(/https:\/\/[a-z0-9-]+\.supabase\.(co|in)/i) ?? raw.match(/https?:\/\/[^\s`'"<>]+/i);
+  return m ? m[0].replace(/[/.,;]+$/, "") : undefined;
+};
+const cleanKey = (raw?: string) => {
+  if (!raw) return undefined;
+  const m = raw.match(/sb_publishable_[A-Za-z0-9_-]+/) ?? raw.match(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/);
+  return m ? m[0] : raw.trim().replace(/^[`'"]+|[`'"]+$/g, "") || undefined;
+};
+
+const envUrl = cleanUrl(import.meta.env.VITE_SUPABASE_URL as string | undefined);
+const envKey = cleanKey(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined);
 
 /** False when the Supabase env vars were not present at build time. Public pages still render; auth calls will fail. */
 export const supabaseConfigured = Boolean(envUrl && envKey);
