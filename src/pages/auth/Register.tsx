@@ -7,6 +7,8 @@ import Spinner from "../../components/ui/Spinner";
 import { supabase, siteUrl } from "../../lib/supabase";
 import { checkPassword, cleanName, isValidEmail, normalizeEmail } from "../../auth/validation";
 import { friendlyAuthError } from "../../auth/errors";
+import { useResendVerification } from "../../auth/useResendVerification";
+import { useToast } from "../../components/ui/Toast";
 
 type Errors = Partial<Record<"name" | "email" | "password" | "confirm" | "terms" | "form", string>>;
 
@@ -19,6 +21,8 @@ export default function Register() {
   const [errors, setErrors] = useState<Errors>({});
   const [busy, setBusy] = useState(false);
   const [doneEmail, setDoneEmail] = useState<string | null>(null);
+  const rv = useResendVerification();
+  const toast = useToast();
 
   const validate = (): Errors => {
     const e: Errors = {};
@@ -50,6 +54,12 @@ export default function Register() {
     setDoneEmail(clean);
   };
 
+  const resendNow = async () => {
+    if (!doneEmail || !rv.canResend) return;
+    const r = await rv.resend(doneEmail);
+    toast(r.ok ? "success" : "error", r.message);
+  };
+
   if (doneEmail) {
     return (
       <AuthShell title="Check your email" subtitle="One more step to activate your account.">
@@ -57,6 +67,10 @@ export default function Register() {
           <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3" /><path d="M3 7l9 6 9-6" /></svg>
           <p>If <b>{doneEmail}</b> can be registered, we've sent a verification link to it. Open the email and follow the link, then log in.</p>
           <p className="muted">If you already have an account with this address, no new account is created. Try logging in or resetting your password.</p>
+          <p className="muted">Didn't get it? It can take a few minutes — check your spam or promotions folder.</p>
+          <button type="button" className="text-btn" onClick={resendNow} disabled={!rv.canResend}>
+            {rv.sending ? "Sending…" : rv.cooldown > 0 ? `Resend in ${rv.cooldown}s` : "Resend verification email"}
+          </button>
         </div>
         <Link to="/login" className="btn btn-primary btn-lg auth-submit"><span>Go to login</span></Link>
       </AuthShell>

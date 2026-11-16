@@ -8,8 +8,8 @@ export function friendlyAuthError(err: AuthError | { message: string; code?: str
     case "invalid_credentials": return "Incorrect email or password.";
     case "email_not_confirmed": return "Your email address isn't verified yet. Check your inbox for the verification link.";
     case "weak_password": return "That password is too weak or has appeared in known data breaches. Please choose another.";
-    case "over_request_rate_limit":
-    case "over_email_send_rate_limit": return "Too many attempts. Please wait a few minutes and try again.";
+    case "over_request_rate_limit": return "Too many attempts. Please wait a few minutes and try again.";
+    case "over_email_send_rate_limit": return "We've hit the email sending limit for now. Please wait a while before requesting another email.";
     case "user_banned": return "This account is unavailable. Contact support.";
     case "same_password": return "Your new password must be different from the old one.";
     case "otp_expired": return "This link has expired or was already used. Please request a new one.";

@@ -6,6 +6,7 @@ import PasswordField from "../../components/auth/PasswordField";
 import Spinner from "../../components/ui/Spinner";
 import { useToast } from "../../components/ui/Toast";
 import { supabase, setRemember, siteUrl } from "../../lib/supabase";
+import { useResendVerification } from "../../auth/useResendVerification";
 import { isValidEmail, normalizeEmail } from "../../auth/validation";
 import { friendlyAuthError } from "../../auth/errors";
 
@@ -50,11 +51,12 @@ export default function Login() {
     nav(dest, { replace: true });
   };
 
+  const rv = useResendVerification();
   const resend = async () => {
     const clean = normalizeEmail(email);
-    if (!isValidEmail(clean)) return;
-    const { error } = await supabase.auth.resend({ type: "signup", email: clean, options: { emailRedirectTo: `${siteUrl}/auth/callback` } });
-    toast(error ? "error" : "success", error ? friendlyAuthError(error) : "Verification email sent. Check your inbox.");
+    if (!isValidEmail(clean) || !rv.canResend) return;
+    const r = await rv.resend(clean);
+    toast(r.ok ? "success" : "error", r.message);
   };
 
   const google = async () => {
@@ -74,7 +76,7 @@ export default function Login() {
         {errors.form && (
           <p className="notice error" role="alert">
             {errors.form}{" "}
-            {unverified && <button type="button" className="text-btn" onClick={resend}>Resend verification email</button>}
+            {unverified && <button type="button" className="text-btn" onClick={resend} disabled={!rv.canResend}>{rv.sending ? "Sending…" : rv.cooldown > 0 ? `Resend in ${rv.cooldown}s` : "Resend verification email"}</button>}
           </p>
         )}
         <TextField label="Email address" type="email" value={email} onChange={setEmail} autoComplete="email" error={errors.email} disabled={busy} />
