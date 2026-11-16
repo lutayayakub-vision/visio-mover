@@ -1,5 +1,5 @@
 import Hero from "../components/landing/Hero";
-import UploadDemo from "../components/upload/UploadDemo";
+import UploadSection from "../components/upload/UploadSection";
 import Features from "../components/landing/Features";
 import HowItWorks from "../components/landing/HowItWorks";
 import ComparisonSection from "../components/landing/ComparisonSection";
@@ -11,7 +11,7 @@ export default function Landing() {
   return (
     <>
       <Hero />
-      <UploadDemo />
+      <UploadSection />
       <Features />
       <HowItWorks />
       <ComparisonSection />

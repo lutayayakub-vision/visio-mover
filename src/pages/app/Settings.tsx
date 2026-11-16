@@ -62,7 +62,7 @@ export default function Settings() {
             <span>{busy ? <><Spinner size={16} /> Saving…</> : "Save changes"}</span>
           </button>
         </form>
-        <p className="muted small">Profile pictures arrive with private file storage in Stage 3.</p>
+        <p className="muted small">Profile pictures arrive in a later stage.</p>
       </section>
 
       <section className="panel card">
