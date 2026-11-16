@@ -1,6 +1,6 @@
 import { supabase, supabaseKey, supabaseUrl } from "./supabase";
 
-export const BUCKET = "user-uploads";
+export const BUCKET = "visiomover-files";
 export const QUOTA_BYTES = 524_288_000; // 500 MB, also enforced by a Supabase storage policy
 const MB = 1024 * 1024;
 
