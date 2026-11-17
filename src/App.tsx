@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import { Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import AnimatedBackground from "./components/layout/AnimatedBackground";
 import Navbar from "./components/layout/Navbar";
@@ -17,6 +17,7 @@ import Projects from "./pages/app/Projects";
 import Settings from "./pages/app/Settings";
 import Workspace from "./pages/app/Workspace";
 import EditorPlaceholder from "./pages/app/EditorPlaceholder";
+const Studio = lazy(() => import("./pages/app/Studio"));
 
 function ScrollManager() {
   const { pathname, hash } = useLocation();
@@ -68,8 +69,10 @@ export default function App() {
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/workspace" element={<Workspace />} />
-            <Route path="/image-editor" element={<EditorPlaceholder title="Image Editor" stage="Stage 4" blurb="Remove unwanted marks from images you own or are authorized to edit." />} />
-            <Route path="/video-editor" element={<EditorPlaceholder title="Video Editor" stage="Stage 5" blurb="Select, track and reconstruct regions across video frames." />} />
+            <Route element={<Suspense fallback={<div className="st-center" style={{ padding: 48 }}>Loading editor…</div>}><Studio /></Suspense>}>
+              <Route path="/image-editor" element={null} />
+              <Route path="/video-editor" element={null} />
+            </Route>
             <Route path="/document-editor" element={<EditorPlaceholder title="Document Editor" stage="Stage 6" blurb="Clean PDF, DOCX and PPTX files while preserving their layout." />} />
             <Route path="/projects" element={<Projects />} />
             <Route path="/settings" element={<Settings />} />

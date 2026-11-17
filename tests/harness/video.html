@@ -1,0 +1,9 @@
+<!doctype html><meta charset="utf-8"><title>video engine harness</title>
+<body><script type="module">
+  import * as V from "/src/lib/videoEngine.ts";
+  window.V = V;
+  window.engine = new V.VideoEngine();
+  window.loadFixture = async (name, type) => { const b = await (await fetch("/tests/fixtures/" + name)).blob(); return new File([b], name, { type }); };
+  window.blobToB64 = async (blob) => { const u = new Uint8Array(await blob.arrayBuffer()); let s = ""; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000)); return btoa(s); };
+  window.ready = true;
+</script></body>

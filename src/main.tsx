@@ -9,6 +9,7 @@ import "./styles/global.css";
 import "./styles/landing.css";
 import "./styles/auth.css";
 import "./styles/workspace.css";
+import "./styles/studio.css";
 
 declare const __PREVIEW__: boolean;
 // The embedded preview has no real URL bar, so it routes in memory.
