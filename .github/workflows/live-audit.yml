@@ -24,7 +24,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg python3-pil
       - name: Build production bundle (local mode only)
         if: github.event.inputs.site_url == 'local'
         env:
@@ -32,7 +32,6 @@ jobs:
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
           VITE_ENABLE_GOOGLE: 'false'
         run: npm run build
-      - run: pip install pillow
       - run: python3 tests/make-fixtures.py
       - run: google-chrome --version && ffmpeg -version | head -1
       - name: Run live audit
