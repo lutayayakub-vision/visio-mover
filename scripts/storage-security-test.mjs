@@ -29,6 +29,14 @@ async function login(prefix) {
 const png = () => Buffer.concat([Buffer.from("89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c6360f8cfc0f01f0005000201a5f645400000000049454e44ae426082", "hex"), Buffer.from(randomUUID())]);
 const sha = (b) => createHash("sha256").update(b).digest("hex");
 
+const deepEqual = (a, b) => {
+  if (a === b) return true;
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null || Array.isArray(a) !== Array.isArray(b)) return false;
+  const ka = Object.keys(a), kb = Object.keys(b);
+  return ka.length === kb.length && ka.every((k) => Object.prototype.hasOwnProperty.call(b, k) && deepEqual(a[k], b[k]));
+};
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 const created = []; // { owner, client, path, id }
 
 async function uploadAndRegister(u, name = "test-image.png") {
@@ -53,9 +61,16 @@ async function uploadEdited(u, extra, name = "test-image (edited).png") {
   return { row: ins.data, path };
 }
 
+async function sweep(u) {
+  const rows = await u.client.from("files").select("id, storage_path");
+  for (const r of rows.data ?? []) { await u.client.storage.from(BUCKET).remove([r.storage_path]); await u.client.from("files").delete().eq("id", r.id); }
+  const objs = await u.client.storage.from(BUCKET).list(u.id, { limit: 1000 });
+  for (const o of objs.data ?? []) await u.client.storage.from(BUCKET).remove([`${u.id}/${o.name}`]);
+}
 const A = await login("TEST_A");
 const B = await login("TEST_B");
 if (A.id === B.id) { console.error("TEST_A and TEST_B must be different accounts."); process.exit(2); }
+await sweep(A); await sweep(B); // dedicated test accounts only: clear leftovers from any earlier interrupted run
 
 try {
   console.log("\n== Upload, metadata, persistence ==");
@@ -124,7 +139,12 @@ try {
   const params = { format: "webp", quality: 0.8, crop: { x: 0, y: 0, w: 0.5, h: 0.5 } };
   const ed = await uploadEdited(A, { source_file_id: up.row.id, edit_kind: "image", edit_params: params });
   check("A saves an edited copy linked to own original", !ed.error && ed.row?.source_file_id === up.row.id && ed.row?.edit_kind === "image", ed.error?.message);
-  check("Processing settings are stored with the copy", ed.row && JSON.stringify(ed.row.edit_params) === JSON.stringify(params));
+  // jsonb does not preserve key order, so compare structurally, and read the row back as the owner (not just the insert echo)
+  const edBack = await A.client.from("files").select("edit_params, edit_kind, source_file_id").eq("id", ed.row?.id ?? randomUUID()).single();
+  check("Processing settings are stored with the copy", !edBack.error && deepEqual(edBack.data.edit_params, params) && deepEqual(ed.row?.edit_params, params), edBack.error?.message);
+  const unrelated = await uploadEdited(A, { edit_kind: "image", edit_params: { format: "png", extra: [1, { a: 2 }] } }, "nested.png");
+  const unrelatedBack = await A.client.from("files").select("edit_params").eq("id", unrelated.row?.id ?? randomUUID()).single();
+  check("Nested settings round-trip exactly (regression: key order must not matter, values must)", !unrelatedBack.error && deepEqual(unrelatedBack.data.edit_params, { extra: [1, { a: 2 }], format: "png" }) && !deepEqual(unrelatedBack.data.edit_params, { format: "png", extra: [1, { a: 3 }] }));
   const orig2 = await A.client.storage.from(BUCKET).download(up.path);
   check("Original is untouched after saving an edited copy", !orig2.error && orig2.data?.size === up.bytes.length);
   const bSeesEdit = await B.client.from("files").select("id, edit_params").eq("id", ed.row?.id ?? randomUUID());
@@ -147,13 +167,29 @@ try {
   check("A deletes own object", !del.error && (del.data ?? []).length === 1, del.error?.message);
   const delRow = await A.client.from("files").delete().eq("id", up.row.id).select();
   check("A deletes own metadata row", (delRow.data ?? []).length === 1);
-  const gone = await A.client.storage.from(BUCKET).download(up.path);
-  check("Deleted file can no longer be downloaded", !!gone.error);
+  // Cache-independent proofs first: these cannot be answered from a CDN copy.
+  const resign = await A.client.storage.from(BUCKET).createSignedUrl(up.path, 60);
+  check("Deleted file: a NEW signed URL cannot be created", !!resign.error && !resign.data?.signedUrl, resign.error?.message);
+  const fresh = await fetch(`${URL_}/storage/v1/object/authenticated/${BUCKET}/${up.path}?nocache=${randomUUID()}`, { headers: { Authorization: `Bearer ${A.token}`, apikey: KEY, "cache-control": "no-cache" } });
+  check("Deleted file: cache-busted authenticated download is refused", !fresh.ok, `HTTP ${fresh.status}`);
+  const folder = await A.client.storage.from(BUCKET).list(A.id, { limit: 100 });
+  check("Deleted file: no longer present in the storage listing", !folder.error && !(folder.data ?? []).some((o) => `${A.id}/${o.name}` === up.path), folder.error?.message);
+  // The plain download and the previously issued signed URL may be served from the CDN until it purges the deleted object.
+  // That window must close: poll (up to 120 s) and fail if the deleted bytes are still served after that.
+  let goneErr = null, goneAfter = 0, oldUrlDead = !signed.data?.signedUrl, oldAfter = 0;
+  for (let t = 0; t <= 120; t += 5) {
+    if (!goneErr) { const g = await A.client.storage.from(BUCKET).download(up.path); if (g.error) { goneErr = g.error; goneAfter = t; } }
+    if (!oldUrlDead) { const r = await fetch(signed.data.signedUrl); if (!r.ok) { oldUrlDead = true; oldAfter = t; } else await r.arrayBuffer(); }
+    if (goneErr && oldUrlDead) break;
+    await sleep(5000);
+  }
+  check("Deleted file can no longer be downloaded", !!goneErr, goneErr ? `refused after ${goneAfter}s` : "still served after 120s");
+  check("Previously issued signed URL stops working after deletion", oldUrlDead, oldUrlDead ? `dead after ${oldAfter}s` : "still served after 120s");
   const goneRow = await A.client.from("files").select("id").eq("id", up.row.id);
   check("Deleted file is gone from the listing", goneRow.data?.length === 0);
   const orphan = await A.client.from("files").select("source_file_id, edit_kind").eq("id", ed.row.id).single();
   check("Deleting an original keeps the edited copy (link cleared, not cascaded)", !orphan.error && orphan.data.source_file_id === null && orphan.data.edit_kind === "image", orphan.error?.message);
-  created.length = 0;
+  for (let i = created.length - 1; i >= 0; i--) if (created[i].id === up.row.id) created.splice(i, 1);
 } finally {
   for (const c of created) { await c.u.client.storage.from(BUCKET).remove([c.path]); await c.u.client.from("files").delete().eq("id", c.id); }
 }
