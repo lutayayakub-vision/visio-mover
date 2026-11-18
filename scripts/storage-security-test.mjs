@@ -9,7 +9,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { randomUUID, createHash } from "node:crypto";
 
-const env = (k) => { const v = process.env[k]; if (!v) { console.error(`Missing env var ${k}`); process.exit(2); } return v; };
+const env = (k) => { const v = process.env[k]; if (!v || !v.trim()) { console.error(`Missing or empty env var ${k} (if this runs in GitHub Actions, the secret exists but has an empty value, so re-create it)`); process.exit(2); } return v; };
 const URL_ = env("VITE_SUPABASE_URL").replace(/\/$/, "");
 const KEY = env("VITE_SUPABASE_PUBLISHABLE_KEY");
 const BUCKET = "visiomover-files";

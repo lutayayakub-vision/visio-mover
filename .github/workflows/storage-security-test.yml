@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - name: Run storage + RLS security test
@@ -26,6 +26,7 @@ jobs:
           TEST_A_PASSWORD: ${{ secrets.TEST_A_PASSWORD }}
           TEST_B_EMAIL: ${{ secrets.TEST_B_EMAIL }}
           TEST_B_PASSWORD: ${{ secrets.TEST_B_PASSWORD }}
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          # The project URL is public (it ships in the frontend bundle), so fall back to it if the secret is empty or missing.
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://fvsdnikwwflojyweppun.supabase.co' }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
         run: npm run test:storage
