@@ -7,9 +7,10 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { launch } from "./lib.mjs";
+import { startStatic } from "./static-server.mjs";
 
 const need = (k) => { const v = process.env[k]; if (!v || !v.trim()) { console.error(`Missing env ${k}`); process.exit(2); } return v.trim(); };
-const SITE = need("SITE_URL").replace(/\/$/, ""), SBU = need("VITE_SUPABASE_URL").replace(/\/$/, ""), KEY = need("VITE_SUPABASE_PUBLISHABLE_KEY");
+let SITE = need("SITE_URL").replace(/\/$/, ""); const SBU = need("VITE_SUPABASE_URL").replace(/\/$/, ""), KEY = need("VITE_SUPABASE_PUBLISHABLE_KEY");
 const CRED = { A: [need("TEST_A_EMAIL"), need("TEST_A_PASSWORD")], B: [need("TEST_B_EMAIL"), need("TEST_B_PASSWORD")] };
 const ROOT = new URL("..", import.meta.url).pathname, FIX = join(ROOT, "tests/fixtures"), OUT = join(ROOT, "tests/out/live");
 rmSync(OUT, { recursive: true, force: true }); mkdirSync(OUT, { recursive: true });
@@ -29,6 +30,8 @@ async function sweep(u) {
   for (const o of objs.data ?? []) await u.c.storage.from(BUCKET).remove([`${u.id}/${o.name}`]);
 }
 
+let local = null;
+if (SITE === "local") { local = await startStatic(ROOT, 5301); SITE = local.base; console.log("NOTE  Serving the fresh production build of main locally with the real public/_headers (NOT Netlify). Netlify-specific behaviour is untested in this mode."); }
 const A = await sb("A"), B = await sb("B");
 await sweep(A); await sweep(B);
 const browser = await launch();
@@ -72,7 +75,7 @@ try {
   const studioJs = assets.length ? null : null;
   const idx = assets.find((a) => /index-.*\.js$/.test(a));
   let wasmUrl = null;
-  if (idx) { const js = await (await fetch(SITE + idx)).text(); const m = js.match(/assets\/Studio-[A-Za-z0-9_-]+\.js/); if (m) { const st = await (await fetch(SITE + "/" + m[0])).text(); const w = st.match(/assets\/ffmpeg-core-[A-Za-z0-9_-]+\.wasm/); if (w) wasmUrl = "/" + w[0]; } }
+  if (idx) { const js = await (await fetch(SITE + idx)).text(); const m = js.match(/Studio-[A-Za-z0-9_-]+\.js/); if (m) { const st = await (await fetch(SITE + "/assets/" + m[0])).text(); const w = st.match(/ffmpeg-core-[A-Za-z0-9_-]+\.wasm/); if (w) wasmUrl = "/assets/" + w[0]; } }
   ok("FFmpeg WASM file is deployed", !!wasmUrl, wasmUrl || "not found in Studio chunk");
   if (wasmUrl) {
     const w = await fetch(SITE + wasmUrl, { method: "HEAD" });
@@ -242,7 +245,7 @@ try {
 } finally {
   await sweep(A); await sweep(B);
   const left = await A.c.from("files").select("id"); note(`cleanup: A has ${left.data?.length ?? "?"} files left`);
-  await browser.close();
+  await browser.close(); local?.stop();
 }
 console.log(`\n${total - bad} passed, ${bad} failed`);
 process.exit(bad ? 1 : 0);

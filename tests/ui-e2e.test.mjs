@@ -7,32 +7,15 @@ import { readFileSync, existsSync, statSync, mkdirSync, rmSync, readdirSync } fr
 import { execFileSync, spawnSync } from "node:child_process";
 import { extname, join } from "node:path";
 import { launch } from "./lib.mjs";
+import { startStatic } from "./static-server.mjs";
 
 const ROOT = new URL("..", import.meta.url).pathname;
 const DIST = join(ROOT, "dist"), FIX = join(ROOT, "tests/fixtures"), OUT = join(ROOT, "tests/out/ui");
 rmSync(OUT, { recursive: true, force: true }); mkdirSync(OUT, { recursive: true });
 if (!existsSync(DIST)) throw new Error("run npm run build first");
 
-// ── static server using the real _headers file ──
-const hdrText = readFileSync(join(ROOT, "public/_headers"), "utf8");
-const globalHeaders = {}; let cur = null; const rules = [];
-for (const line of hdrText.split("\n")) {
-  if (!line.trim()) continue;
-  if (!/^\s/.test(line)) { cur = { pat: line.trim(), h: {} }; rules.push(cur); continue; }
-  const i = line.indexOf(":"); cur.h[line.slice(0, i).trim()] = line.slice(i + 1).trim();
-}
-const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".wasm": "application/wasm", ".svg": "image/svg+xml", ".json": "application/json", ".png": "image/png", ".ico": "image/x-icon" };
-const server = http.createServer((req, res) => {
-  const p = decodeURIComponent(new URL(req.url, "http://x").pathname);
-  let f = join(DIST, p);
-  if (!f.startsWith(DIST) || !existsSync(f) || statSync(f).isDirectory()) f = join(DIST, "index.html");
-  const h = { "Content-Type": MIME[extname(f)] || "application/octet-stream" };
-  for (const r of rules) { const re = new RegExp("^" + r.pat.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + "$"); if (re.test(p)) Object.assign(h, r.h); }
-  res.writeHead(200, h); res.end(readFileSync(f));
-});
-await new Promise((r) => server.listen(5300, "127.0.0.1", r));
-const BASE = "http://127.0.0.1:5300";
-
+const srv = await startStatic(ROOT, 5300);
+const BASE = srv.base;
 // ── Supabase stand-in ──
 const REF = "fvsdnikwwflojyweppun", SB = `https://${REF}.supabase.co`;
 const ME = "11111111-1111-4111-8111-111111111111", OTHER = "22222222-2222-4222-8222-222222222222";
@@ -311,5 +294,5 @@ await mob.screenshot({ path: `${OUT}/mobile-workspace.png` });
 ok("no Content-Security-Policy violations in the production build", cspViolations.length === 0, cspViolations.slice(0, 2).join(" | "));
 ok("no uncaught page errors", pageErrors.length === 0, pageErrors.slice(0, 2).join(" | "));
 console.log(`\n${total - bad}/${total} passed`);
-await browser.close(); server.close();
+await browser.close(); srv.stop();
 process.exit(bad ? 1 : 0);

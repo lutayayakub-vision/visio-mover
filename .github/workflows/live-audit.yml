@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       site_url:
-        description: Deployed site URL (no trailing slash)
+        description: Deployed site URL (no trailing slash), or "local" to build and serve main here with the real _headers
         required: true
         default: https://visiomover.netlify.app
 
@@ -25,6 +25,13 @@ jobs:
           cache: npm
       - run: npm ci
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - name: Build production bundle (local mode only)
+        if: github.event.inputs.site_url == 'local'
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://fvsdnikwwflojyweppun.supabase.co' }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_ENABLE_GOOGLE: 'false'
+        run: npm run build
       - run: pip install pillow
       - run: python3 tests/make-fixtures.py
       - run: google-chrome --version && ffmpeg -version | head -1
