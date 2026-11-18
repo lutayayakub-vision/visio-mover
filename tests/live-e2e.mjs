@@ -36,8 +36,9 @@ const A = await sb("A"), B = await sb("B");
 await sweep(A); await sweep(B);
 const browser = await launch();
 const csp = [], pageErrors = [];
-async function newPage(viewport, ua) {
-  const page = await browser.newPage();
+async function newPage(viewport, ua, isolated = false) {
+  // an isolated (incognito-style) context has its own localStorage, so a second account never inherits the first one's session
+  const page = await (isolated ? (await browser.createBrowserContext()).newPage() : browser.newPage());
   if (ua) await page.setUserAgent(ua);
   await page.setViewport(viewport);
   page.on("console", (m) => { if (/Content Security Policy|Refused to/i.test(m.text())) csp.push(m.text()); });
@@ -205,7 +206,7 @@ try {
 
   // ═══ 6. User isolation (live) ═══
   const edId = edImg.data[0].id;
-  const pb = await newPage({ width: 1280, height: 900 });
+  const pb = await newPage({ width: 1280, height: 900 }, undefined, true);
   await uiLogin(pb, "B");
   await pb.goto(SITE + "/workspace", { waitUntil: "networkidle0" });
   await sleep(1500);
@@ -219,7 +220,7 @@ try {
 
   // ═══ 7. Android phone emulation on the deployed site ═══
   const ua = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36";
-  const mob = await newPage({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }, ua);
+  const mob = await newPage({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }, ua, true);
   await uiLogin(mob, "A");
   const overflow = async (label) => { const o = await mob.evaluate(() => ({ sw: document.documentElement.scrollWidth, iw: innerWidth })); ok(`Mobile: no horizontal overflow on ${label}`, o.sw <= o.iw + 1, JSON.stringify(o)); };
   await mob.goto(SITE + "/workspace", { waitUntil: "networkidle0" }); await mob.waitForSelector(".frow"); await overflow("workspace");
