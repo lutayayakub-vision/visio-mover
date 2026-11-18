@@ -1,0 +1,20 @@
+name: Site probe
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe candidate Netlify URLs
+        run: |
+          for h in visiomover visiomoverv1 mellifluous-donut-1f3c72 deploy-preview-6--visiomover deploy-preview-6--visiomoverv1 deploy-preview-6--mellifluous-donut-1f3c72; do
+            u="https://$h.netlify.app"
+            echo "== $u"
+            curl -sS -m 20 -D - -o /tmp/body.html "$u/" | grep -iE "^HTTP|content-security-policy|x-nf-request-id" | cut -c1-260
+            grep -oE '/assets/[A-Za-z0-9_.-]+' /tmp/body.html | sort -u | tr '\n' ' '; echo
+            grep -oiE '<title>[^<]*' /tmp/body.html
+            curl -sS -m 20 -o /dev/null -w "login page HTTP %{http_code}\n" "$u/login"
+          done
