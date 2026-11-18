@@ -1,9 +1,14 @@
 [build]
   command = "npm run build"
   publish = "dist"
+  # Save build credits: skip the build when nothing that ships to users changed.
+  # Exit code 0 = skip, non-zero = build. Tests, CI workflows, scripts, SQL migrations and *.md files never reach the site.
+  # If CACHED_COMMIT_REF is unknown (first deploy) the command errors, so Netlify builds as normal.
+  ignore = "git diff --quiet \"$CACHED_COMMIT_REF\" \"$COMMIT_REF\" -- . ':!tests' ':!.github' ':!scripts' ':!supabase' ':!*.md'"
 
 [build.environment]
-  NODE_VERSION = "20"
+  # Vite 8 needs Node >= 20.19 or >= 22.12. 22 is what the CI audits ran on.
+  NODE_VERSION = "22"
 
 # Set these two in Netlify: Site configuration -> Environment variables (they are public values, never a service_role key)
 #   VITE_SUPABASE_URL

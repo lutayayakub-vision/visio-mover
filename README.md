@@ -44,3 +44,12 @@ In Supabase, add `http://localhost:5173/**` to Authentication -> URL Configurati
 ## Deploy on Netlify
 
 Connect the repository, then set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in Site configuration -> Environment variables. `netlify.toml` provides the build settings.
+
+Stage 4 (image and video editing) notes:
+
+- Production branch must be `main`. Processing runs in the visitor's browser, so no Netlify Functions or extra services are used.
+- The video engine (`ffmpeg-core-*.wasm`, about 32 MB, about 10 MB compressed) is built into `dist/assets` and loaded only when someone exports a video. `public/_headers` must keep `'wasm-unsafe-eval'` in `script-src` and `worker-src 'self' blob:`, or video export fails.
+- Optional: set `VITE_FFMPEG_CORE_BASE_URL` to host the two engine files elsewhere (then also allow that host in `script-src` and `connect-src`).
+- `netlify.toml` skips builds that only change tests, CI workflows, scripts, SQL or markdown files, to save build credits.
+- The Stage 4 SQL migration (`supabase/migrations/20261116b_stage4_edit_metadata.sql`) is already applied to the live Supabase project.
+- ffmpeg-core is licensed GPL-2.0-or-later.
