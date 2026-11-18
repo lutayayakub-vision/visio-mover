@@ -42,6 +42,17 @@ async function uploadAndRegister(u, name = "test-image.png") {
   return { row: ins.data, path, bytes };
 }
 
+async function uploadEdited(u, extra, name = "test-image (edited).png") {
+  const bytes = png();
+  const path = `${u.id}/${randomUUID()}.png`;
+  const up = await u.client.storage.from(BUCKET).upload(path, bytes, { contentType: "image/png", upsert: false });
+  if (up.error) return { error: up.error, path };
+  const ins = await u.client.from("files").insert({ storage_path: path, original_name: name, category: "image", mime_type: "image/png", size_bytes: 1, ...extra }).select().single();
+  if (ins.error) { await u.client.storage.from(BUCKET).remove([path]); return { error: ins.error, path }; }
+  created.push({ u, path, id: ins.data.id });
+  return { row: ins.data, path };
+}
+
 const A = await login("TEST_A");
 const B = await login("TEST_B");
 if (A.id === B.id) { console.error("TEST_A and TEST_B must be different accounts."); process.exit(2); }
@@ -109,6 +120,28 @@ try {
   const ghost = await A.client.from("files").insert({ storage_path: `${A.id}/${randomUUID()}.png`, original_name: "ghost.png", category: "image", mime_type: "image/png", size_bytes: 5 });
   check("Metadata without a stored object is rejected", !!ghost.error, ghost.error?.message);
 
+  console.log("\n== Stage 4: edited copies and lineage ==");
+  const params = { format: "webp", quality: 0.8, crop: { x: 0, y: 0, w: 0.5, h: 0.5 } };
+  const ed = await uploadEdited(A, { source_file_id: up.row.id, edit_kind: "image", edit_params: params });
+  check("A saves an edited copy linked to own original", !ed.error && ed.row?.source_file_id === up.row.id && ed.row?.edit_kind === "image", ed.error?.message);
+  check("Processing settings are stored with the copy", ed.row && JSON.stringify(ed.row.edit_params) === JSON.stringify(params));
+  const orig2 = await A.client.storage.from(BUCKET).download(up.path);
+  check("Original is untouched after saving an edited copy", !orig2.error && orig2.data?.size === up.bytes.length);
+  const bSeesEdit = await B.client.from("files").select("id, edit_params").eq("id", ed.row?.id ?? randomUUID());
+  check("B cannot read A's edited copy or its settings", !bSeesEdit.error && bSeesEdit.data.length === 0);
+  const bLink = await uploadEdited(B, { source_file_id: up.row.id, edit_kind: "image", edit_params: {} }, "stolen-link.png");
+  check("B cannot create a copy that points at A's original", !!bLink.error, bLink.error?.message);
+  const badKind = await uploadEdited(A, { source_file_id: up.row.id, edit_kind: "hack", edit_params: {} });
+  check("Unknown edit_kind is rejected", !!badKind.error, badKind.error?.message);
+  const noKind = await uploadEdited(A, { source_file_id: up.row.id, edit_params: {} });
+  check("A source link without an edit_kind is rejected", !!noKind.error, noKind.error?.message);
+  const bigParams = await uploadEdited(A, { source_file_id: up.row.id, edit_kind: "image", edit_params: { pad: "x".repeat(9000) } });
+  check("Oversized edit_params (> 8 KB) is rejected", !!bigParams.error, bigParams.error?.message);
+  const arrParams = await uploadEdited(A, { edit_kind: "image", edit_params: [1, 2] });
+  check("edit_params must be a JSON object", !!arrParams.error, arrParams.error?.message);
+  const bUpdEdit = await B.client.from("files").update({ edit_kind: "video" }).eq("id", ed.row?.id ?? randomUUID()).select();
+  check("B cannot modify A's edited-copy metadata", !!bUpdEdit.error || (bUpdEdit.data ?? []).length === 0);
+
   console.log("\n== Secure deletion (owner) ==");
   const del = await A.client.storage.from(BUCKET).remove([up.path]);
   check("A deletes own object", !del.error && (del.data ?? []).length === 1, del.error?.message);
@@ -118,6 +151,8 @@ try {
   check("Deleted file can no longer be downloaded", !!gone.error);
   const goneRow = await A.client.from("files").select("id").eq("id", up.row.id);
   check("Deleted file is gone from the listing", goneRow.data?.length === 0);
+  const orphan = await A.client.from("files").select("source_file_id, edit_kind").eq("id", ed.row.id).single();
+  check("Deleting an original keeps the edited copy (link cleared, not cascaded)", !orphan.error && orphan.data.source_file_id === null && orphan.data.edit_kind === "image", orphan.error?.message);
   created.length = 0;
 } finally {
   for (const c of created) { await c.u.client.storage.from(BUCKET).remove([c.path]); await c.u.client.from("files").delete().eq("id", c.id); }
