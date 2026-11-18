@@ -8,7 +8,10 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test:storage": "node scripts/storage-security-test.mjs"
+    "test:storage": "node scripts/storage-security-test.mjs",
+    "test:image": "node tests/image-engine.test.mjs",
+    "test:video": "node tests/video-engine.test.mjs",
+    "test:ui": "npm run build && node tests/ui-e2e.test.mjs"
   },
   "keywords": [],
   "author": "",
@@ -16,6 +19,9 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@ffmpeg/core": "^0.12.10",
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
     "@supabase/supabase-js": "^2.119.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -25,6 +31,7 @@
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^6.3.0",
+    "puppeteer-core": "^25.17.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.8",
     "vite-plugin-singlefile": "^2.3.4"

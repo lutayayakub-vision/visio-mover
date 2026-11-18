@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../../auth/AuthContext";
 import { useToast } from "../../components/ui/Toast";
 import Spinner from "../../components/ui/Spinner";
 import FileIcon from "../../components/workspace/FileIcon";
 import ConfirmDialog from "../../components/workspace/ConfirmDialog";
+import { isEditable } from "../../lib/editing";
 import UploadQueue, { type QItem } from "../../components/workspace/UploadQueue";
 import {
   ACCEPT, ALLOWED_LABEL, CATEGORY_LABEL, QUOTA_BYTES, SPECS,
@@ -287,12 +289,13 @@ export default function Workspace() {
                 <div className="f-main">
                   <span className="f-name" title={f.original_name}>{f.original_name}</span>
                   <span className="f-meta">
-                    <span className={`tag tag-${f.category}`}>{extOf(f.original_name).toUpperCase() || CATEGORY_LABEL[f.category]}</span>
+                    <span className={`tag tag-${f.category}`}>{extOf(f.original_name).toUpperCase() || CATEGORY_LABEL[f.category]}</span>{f.edit_kind && <span className="tag">EDITED</span>}
                     <span>{formatBytes(f.size_bytes)}</span>
                     <span>Uploaded {formatDate(f.created_at)}</span>
                   </span>
                 </div>
                 <div className="f-actions">
+                  {isEditable(f) && <Link className="btn btn-ghost btn-sm" to={`/${f.category}-editor?file=${f.id}`} aria-label={`Edit ${f.original_name}`}><span>Edit</span></Link>}
                   <button className="btn btn-ghost btn-sm" onClick={() => download(f)} disabled={downloading === f.id} aria-label={`Download ${f.original_name}`}>
                     <span>{downloading === f.id ? <Spinner size={14} /> : "Download"}</span>
                   </button>

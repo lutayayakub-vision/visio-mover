@@ -1,0 +1,31 @@
+name: Storage security test
+
+# Manual only. Runs scripts/storage-security-test.mjs against your Supabase project from GitHub's runners.
+# Secrets (Settings > Secrets and variables > Actions): TEST_A_EMAIL, TEST_A_PASSWORD, TEST_B_EMAIL, TEST_B_PASSWORD,
+# VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY. Use two dedicated, email-confirmed TEST accounts. Never service-role keys.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  storage-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Run storage + RLS security test
+        env:
+          TEST_A_EMAIL: ${{ secrets.TEST_A_EMAIL }}
+          TEST_A_PASSWORD: ${{ secrets.TEST_A_PASSWORD }}
+          TEST_B_EMAIL: ${{ secrets.TEST_B_EMAIL }}
+          TEST_B_PASSWORD: ${{ secrets.TEST_B_PASSWORD }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+        run: npm run test:storage

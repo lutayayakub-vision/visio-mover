@@ -14,6 +14,9 @@ export type FileRecord = {
   mime_type: string;
   size_bytes: number;
   created_at: string;
+  /** Set when this file is an edited copy made in the Editing Studio (Stage 4). */
+  source_file_id?: string | null;
+  edit_kind?: "image" | "video" | "thumbnail" | null;
 };
 
 /** Per-file limits. The bucket itself also refuses anything over 50 MB (Supabase free-plan ceiling). */
@@ -135,8 +138,10 @@ export async function uploadObject(
 }
 
 /** Creates the searchable record. Size and type are re-read from storage by the database, not trusted from here. */
-export async function registerFile(path: string, name: string, category: Category, mime: string, size: number): Promise<void> {
-  const { error } = await supabase.from("files").insert({ storage_path: path, original_name: name, category, mime_type: mime, size_bytes: size });
+export type EditMeta = { source_file_id: string | null; edit_kind: "image" | "video" | "thumbnail"; edit_params: Record<string, unknown> };
+
+export async function registerFile(path: string, name: string, category: Category, mime: string, size: number, edit?: EditMeta): Promise<void> {
+  const { error } = await supabase.from("files").insert({ storage_path: path, original_name: name, category, mime_type: mime, size_bytes: size, ...(edit ?? {}) });
   if (error) {
     await supabase.storage.from(BUCKET).remove([path]); // don't leave an unlisted file behind
     throw new Error("The file uploaded but couldn't be saved to your library, so it was removed. Please try again.");
@@ -150,7 +155,7 @@ const escapeLike = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
 export async function listFiles(q: ListQuery): Promise<{ rows: FileRecord[]; total: number }> {
   let query = supabase
     .from("files")
-    .select("id, storage_path, original_name, category, mime_type, size_bytes, created_at", { count: "exact" });
+    .select("id, storage_path, original_name, category, mime_type, size_bytes, created_at, source_file_id, edit_kind", { count: "exact" });
   if (q.category !== "all") query = query.eq("category", q.category);
   const term = q.search.trim();
   if (term) query = query.ilike("original_name", `%${escapeLike(term)}%`);

@@ -5,8 +5,8 @@ import FileIcon from "../../components/workspace/FileIcon";
 import { QUOTA_BYTES, extOf, formatBytes, formatDate, getUsedBytes, listFiles, type FileRecord } from "../../lib/files";
 
 const entries = [
-  { to: "/image-editor", label: "Images", types: "JPG · PNG · WEBP", stage: "Stage 4", icon: "M3 4h18v16H3zM3 16l5-5 4 4 3-3 6 6M9 9a1 1 0 1 0 0 .01" },
-  { to: "/video-editor", label: "Videos", types: "MP4 · MOV · WEBM", stage: "Stage 5", icon: "M3 6h12v12H3zM15 10l6-3v10l-6-3" },
+  { to: "/image-editor", label: "Images", types: "JPG · PNG · WEBP", stage: "Ready", icon: "M3 4h18v16H3zM3 16l5-5 4 4 3-3 6 6M9 9a1 1 0 1 0 0 .01" },
+  { to: "/video-editor", label: "Videos", types: "MP4 · MOV · WEBM", stage: "Ready", icon: "M3 6h12v12H3zM15 10l6-3v10l-6-3" },
   { to: "/document-editor", label: "Documents", types: "PDF · DOCX · PPTX", stage: "Stage 6", icon: "M7 3h8l4 4v14H7zM15 3v4h4M10 12h6M10 16h6" },
 ];
 
@@ -73,8 +73,8 @@ export default function Dashboard() {
       </section>
 
       <section className="panel card" aria-labelledby="ed-h">
-        <div className="panel-head"><h2 id="ed-h">Editors</h2><span className="badge soon">Coming in Stages 4 to 6</span></div>
-        <p className="muted">Mark removal tools are not built yet, so these pages are placeholders.</p>
+        <div className="panel-head"><h2 id="ed-h">Editors</h2><span className="badge soon">Documents coming in Stage 6</span></div>
+        <p className="muted">Image and video editing run in your browser. The document editor is not built yet.</p>
         <div className="entry-grid">
           {entries.map((e) => (
             <Link key={e.to} to={e.to} className="entry">
