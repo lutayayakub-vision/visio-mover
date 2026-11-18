@@ -1,0 +1,46 @@
+name: Live deployed-app audit
+
+# Manual only. Drives the DEPLOYED site in headless Chrome with the two dedicated TEST accounts and real Supabase.
+# Needs the same six repository secrets as the storage security test.
+on:
+  workflow_dispatch:
+    inputs:
+      site_url:
+        description: Deployed site URL (no trailing slash)
+        required: true
+        default: https://visiomover.netlify.app
+
+permissions:
+  contents: read
+
+jobs:
+  live-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: pip install pillow
+      - run: python3 tests/make-fixtures.py
+      - run: google-chrome --version && ffmpeg -version | head -1
+      - name: Run live audit
+        env:
+          SITE_URL: ${{ github.event.inputs.site_url }}
+          CHROME_PATH: /usr/bin/google-chrome
+          TEST_A_EMAIL: ${{ secrets.TEST_A_EMAIL }}
+          TEST_A_PASSWORD: ${{ secrets.TEST_A_PASSWORD }}
+          TEST_B_EMAIL: ${{ secrets.TEST_B_EMAIL }}
+          TEST_B_PASSWORD: ${{ secrets.TEST_B_PASSWORD }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://fvsdnikwwflojyweppun.supabase.co' }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+        run: node tests/live-e2e.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: live-audit-screenshots
+          path: tests/out/live/*.png
+          if-no-files-found: ignore
