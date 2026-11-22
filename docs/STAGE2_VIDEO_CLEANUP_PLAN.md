@@ -1,82 +1,93 @@
-# Stage 2 – Video cleanup: implementation plan (PLAN ONLY, no code written)
+# Stage 2 – Video cleanup: implementation plan v2 (PLAN ONLY, awaiting approval)
 
-Status: proposal for approval. Nothing here is built. Builds on Stage 1 (image cleanup) and the existing Video Editor.
+Branch for this work: `stage2-video-cleanup` (created from `cleanup-stage1-inpainting`, which stays untouched). No code is written until this plan is approved. No merge to `main`, no Netlify deploy, no production-config change at any point.
 
-## 1. Goal and honest scope
-Remove an unwanted object from a short clip the user owns or may modify (a logo/watermark they own, a stray person, a sensor spot), inside the existing **Video Editor**, on the user's device, saving a **new** edited copy and never touching the original.
+## 0. Decisions already approved
+1. Free, non-AI PatchMatch only. No paid GPU provider, external AI service or API key.
+2. Limits: 10 s desktop, 5 s mobile.
+3. Reuse `edit_kind = 'cleanup'`; record media type and settings in `edit_params`. **No migration needed** (verified: no constraint ties `edit_kind` to `category`; `video/mp4` + `'cleanup'` is already accepted; `edit_params` ≤ 8 KB).
+4. Automatic object tracking, with manual keyframe correction when tracking is inaccurate.
+5. Fixed-camera scenes first; limitations with moving cameras, complex motion, occlusion and changing backgrounds are communicated clearly in the UI.
+6. Resolution, frame-count, memory and processing-time limits (§3).
+7. ~2-second chunks; reliable cancellation.
+8. Original preserved byte-for-byte; results saved as new copies linked to the original.
+9. Six independently testable milestones with automated tests each (§5).
+10. No merge, no deploy, no production changes.
 
-What a non-AI, on-device engine can and cannot do:
-| Case | Achievable? | Approach |
-|---|---|---|
-| Object fixed on screen (overlay, logo, dust spot), background moving | Good | **2a** reveal background from other frames, spatial fill as fallback |
-| Moving object, static camera | Good | **2a/2b** background plate from frames where the object is elsewhere |
-| Moving object, moving camera, complex scene | Weak / flickery | needs neural video inpainting (see §9). Not promised in 2a/2b |
-| Large object hiding unique structure (faces, text) | Poor | same limit as Stage 1 |
+## 1. What it will and will not do (shown to the user in the UI)
+| Situation | Behaviour |
+|---|---|
+| Fixed camera, object fixed or moving over a background that is revealed in other frames | Supported. Best quality (background taken from real frames, no flicker) |
+| Fixed camera, object covers background that is never visible | Supported, spatial PatchMatch fill (Stage 1 quality), temporally stabilised |
+| Moving camera / pans / zooms | **Detected and warned** ("camera moves; result may flicker or smear"). Spatial-only mode offered; never presented as reliable |
+| Fast or complex motion, motion blur, object leaves/re-enters, partial occlusion, lighting changes | Tracker reports low confidence on those frames; they are flagged and need manual keyframes. The run is never silently continued with a bad mask |
+| Shot cuts | Detected; processing state resets at the cut |
+| Large object hiding unique structure (faces, text) | Poor, same limit as Stage 1 |
 
-## 2. What we measured (to size the work)
-Stage 1 core, single thread, Node (browser worker is similar to ~2× slower): ROI 320×240 → 0.16 s/frame; 480×360 → 0.23 s; 640×360 → 0.35 s; 960×540 → 0.67 s; 1280×720 → 1.1 s.
-So a 10 s clip at 30 fps (300 frames) with a 640×360 region ≈ 105 s on one thread; ≈ 30–50 s with a 4-worker pool. Limits below are derived from this. Existing video limits stay: 50 MB desktop / 30 MB phone input, 50 MB bucket cap on output.
+## 2. Architecture (reuse, no duplicate editors)
+**Reused:** `VideoEditor` (new "Remove object" mode, same pattern as `ImageEditor`), `CleanupStage` (brush, eraser, zoom, pan, undo on a paused frame), `strokes.ts`, `inpaint/core.ts` + worker, `VideoEngine` (ffmpeg.wasm, its `terminate()`, segment concat), `saveEditedCopy`, `CompareSlider`, existing storage/RLS.
 
-## 3. Architecture (reuse, do not duplicate)
-- **Reuse** `VideoEditor` (new "Remove object" mode, same pattern as Stage 1 in `ImageEditor`), `CleanupStage` (brush/eraser/zoom/pan/undo on a paused frame), `strokes.ts`, `inpaint/core.ts`, `VideoEngine` (ffmpeg.wasm), `saveEditedCopy`, `CompareSlider`.
-- **New** `src/lib/videoCleanup.ts` (orchestrator), `src/lib/inpaint/temporal.ts` (pure, DOM-free, unit-testable), worker pool wrapper reusing `inpaint/worker.ts` with a new message type.
-- **Pipeline per chunk (≈2 s, keyframe-aligned):** ffmpeg.wasm `crop` filter extracts only the working region as raw/PNG frames → worker pool → composite onto the full frame (non-masked pixels copied exactly) → x264 encode of the chunk (existing encode settings) → at the end concat chunks with `-c copy` (the existing multi-segment path) and mux the original audio untouched (`-c:a copy` when compatible, existing AAC path otherwise). Chunking keeps ffmpeg's in-memory filesystem bounded (a 300-frame 640×360 RGBA ROI would otherwise be ~280 MB).
-- Core changes (backward compatible, Stage 1 tests must stay green): optional `init` estimate / NNF so frame N starts from frame N-1's solution; optional extra exemplar frames as source; export NNF.
+**New (all pure/DOM-free where possible, so they are unit-testable in Node):**
+- `src/lib/inpaint/temporal.ts` – background-plate (temporal median over frames where the pixel is unmasked), camera-motion check, shot-cut detection, 3-frame smoothing inside the filled region, seam handling.
+- `src/lib/track/tracker.ts` – tracker (below).
+- `src/lib/videoCleanup.ts` – orchestrator: limits, frame extraction, chunk loop, worker pool, composite, encode, concat, cancel, ETA.
+- `src/lib/inpaint/pool.ts` – small worker pool (N workers, terminate-all).
+- Core additions (backward compatible; Stage 1 tests must stay green): optional `init` estimate/NNF so frame N starts from frame N-1; optional extra exemplar frames.
+- UI: `VideoCleanupStage.tsx` (frame scrubber + mask + track + keyframe timeline) inside the Video Editor.
 
-## 4. Temporal consistency (the hard part)
-1. **Background-plate (2a):** for each masked pixel, take the temporal median over nearby frames where that pixel is *not* masked and the scene is static (static-camera check via frame-difference outside the mask). Free of flicker and exact when the background is visible in some frame.
-2. **Spatial fallback:** pixels never revealed are synthesised by the Stage 1 PatchMatch, **initialised from the previous frame's result** (NNF propagation), same seed, so the fill is stable rather than re-invented every frame.
-3. **Smoothing:** weighted 3-frame blend inside the filled region only, disabled across detected shot cuts (histogram jump) where state resets.
-4. **Seam:** reuse the Stage 1 seam correction per frame.
-5. Static-camera check fails → warn the user ("camera moves; result may flicker") and offer spatial-only mode. Never silently pretend it worked.
+**Tracker (fixed-camera first):** template matching on a downscaled grayscale ROI. The object's mask (drawn on a frame) defines a template; for each following frame, normalised cross-correlation over a limited search window gives dx,dy (sub-pixel refinement); the mask is translated accordingly (optional uniform scale after the first working version). Per-frame **confidence** = NCC peak, peak-to-second-peak ratio, and a **forward-backward check** (track back and compare). Below threshold → frame flagged "needs review", tracking stops there and waits for a keyframe. A manual keyframe re-anchors the template; tracking continues forward and backward from it; between two keyframes the mask is interpolated. Fixed-camera check: global motion of the area outside the mask (phase correlation); above threshold → camera-move warning.
 
-## 5. Masks
-- **2a:** one mask (strokes drawn on a paused frame), applied to a chosen time range (default: whole kept clip). Fixed screen position.
-- **2b:** up to 8 **keyframes**; the mask shape/position is linearly interpolated between them (strokes stored as vectors, as in Stage 1). User scrubs, adjusts, previews.
-- **2c (optional, decision needed):** tracking-assisted propagation (template/optical-flow tracker) to reduce manual keyframes. Higher risk; only after 2a/2b pass.
+**Pipeline (per ~2 s chunk, aligned to frames):**
+1. ffmpeg.wasm extracts only the working region (crop filter) for the chunk as raw frames, plus the frames needed for the background plate (neighbouring chunk frames within a small window).
+2. Tracker output → per-frame mask. Worker pool inpaints frames (plate first, spatial fallback, previous-frame init, fixed seed).
+3. Composite: only masked pixels change; every other pixel of the full frame is copied exactly.
+4. Encode the chunk with the existing x264 settings; at the end concat chunks with `-c copy` and mux the **original audio untouched** (existing audio path).
+5. Chunking bounds ffmpeg's in-memory filesystem; chunk files are deleted as soon as they are concatenated.
 
-## 6. UI (inside the existing Video Editor)
-"Remove object" card → scrub to a frame → brush/eraser/size/zoom/pan/undo (reuse `CleanupStage`) → choose range → **Preview 2 s** (≈15–20 frames, same pipeline, before/after) → **Reconstruct whole clip** with progress, frame counter, ETA, **Cancel** (terminate workers, free MEMFS) → result player with before/after → **Apply / Discard** → existing export/save/download. Clear errors for every failure; desktop and 390 px layouts.
+**Metadata** (`edit_params`, ≤ 8 KB, compact): `{kind:"cleanup", cleanup:{media:"video", engine:"patchmatch-inpaint", version, ai:false, tracking:{method, keyframes, flaggedFrames, minConfidence}, range, fps, frames, region, chunkSeconds, camera:"fixed"|"warned", limitationsShown:[...], ms}}`. Full masks are not stored.
 
-## 7. Limits (initial, to be confirmed by device testing)
+## 3. Resource limits (initial; confirmed by real measurements during M4)
 | | Desktop | Mobile |
 |---|---|---|
-| Clip length processed | ≤ 10 s | ≤ 5 s |
-| Frame rate processed | ≤ 30 fps (higher is re-timed to 30 only with user consent, otherwise refused) | ≤ 30 fps |
+| Input file (existing) | 50 MB | 30 MB |
+| Processed duration | ≤ 10 s | ≤ 5 s |
+| Frame rate | ≤ 30 fps (higher: refused with advice to trim/convert) | ≤ 30 fps |
+| Frame count | ≤ 300 | ≤ 150 |
+| Source frame size | ≤ 1920×1080 | ≤ 1280×720 |
 | Working region | ≤ 2 MP | ≤ 0.5 MP |
-| Workers | `min(4, hardwareConcurrency−1)` | 1–2 |
-| Output | must fit the 50 MB bucket cap, checked before save | same |
-Longer clips: user trims first (existing trim tool) and cleans the kept part.
+| Chunk | ~2 s (≤ 60 frames) | ~2 s (≤ 60 frames) |
+| Raw frames held per chunk | ≤ ~120 MB | ≤ ~40 MB |
+| Workers | `min(4, hardwareConcurrency − 1)` | 1–2 |
+| Keyframes | ≤ 8 manual (+ automatic tracking) | ≤ 8 |
+| Output | must fit the 50 MB bucket cap; checked before saving | same |
+| Time | ETA measured on the first frames; **refuse before starting** if projected > 10 min (desktop) / 6 min (mobile); stop and offer options if real time exceeds 2× the projection | same |
+Anything over a limit is refused up front with a specific message (trim first, smaller region, lower resolution) – never started and abandoned.
 
-## 8. Supabase, security, privacy, licensing
-- **No new migration needed:** reuse `edit_kind = 'cleanup'` (already allowed) with `edit_params.cleanup.media = "video"`, category `video`, `source_file_id` = original. RLS, grants, triggers, bucket unchanged. If we prefer a distinct kind (`'video_cleanup'`) it is one CHECK-widening migration like Stage 1; user approval first.
-- `edit_params` stays ≤ 8 KB: store a summary (keyframe count, simplified region, range, frames, engine/version, timings), not full masks.
-- Everything on-device: no upload, no server, no API keys, no new env vars, no service-role use. CSP already allows workers/wasm.
-- Licence: no new dependencies; the existing ffmpeg.wasm core is GPL (libx264) – unchanged, documented in the video docs. Feature is for content the user owns or is authorised to modify.
+## 4. Cancellation and safety
+- One `AbortController`: terminates every pool worker and the ffmpeg instance (`VideoEngine.terminate()`), deletes MEMFS files, discards partial chunks. Target: UI back to idle within ~2 s; a new run works afterwards.
+- No partial result is ever shown or saved. Failure/cancel → clear message, original untouched.
+- The original `File`/stored object is only read (copied into ffmpeg's memory). Tests compare SHA-256 before/after (local file and live storage object).
+- Same private bucket, same RLS/grants/triggers; no new endpoints, env vars, secrets or CSP changes; no upload for processing.
 
-## 9. Decision gates for you
-1. **Accept the non-AI scope** (§1 table), or authorise a neural option later (e.g. a ProPainter-class model). That needs a GPU provider (cost to be quoted, not assumed), an API key you supply, a privacy disclosure because the video leaves the device, and your explicit approval. Not planned for Stage 2.
-2. **Clip limits** in §7 (10 s / 5 s).
-3. **Distinct `edit_kind` or reuse `'cleanup'`** (§8).
-4. **Include tracking (2c)** or stop at keyframes (2b).
+## 5. Six milestones and test strategy
+Each milestone is committed to `stage2-video-cleanup`, must be fully green (previous suites included: Stage 1 47/47 + 15/15, image, video, UI e2e 87/87) and ends with a short report of exact results. I stop for your go/no-go after **M3** (tracking viability is the biggest quality risk) and whenever a gate fails; otherwise I continue to the next milestone and report. Tell me if you want a stop after every milestone instead.
 
-## 10. Milestones and acceptance gates
-| M | Deliverable | Gate (tests actually run) |
+| M | Deliverable | Automated tests / acceptance gate |
 |---|---|---|
-| 0 | Synthetic test videos (ffmpeg-generated: static logo over moving background; moving object over static background; camera pan; shot cut; with audio) + metrics tooling (object-gone, outside-pixels, flicker, audio) | metrics validated against ground truth |
-| 1 | `temporal.ts` + core `init`/exemplar hooks, unit tests | Stage 1 47/47 + 15/15 still pass; new unit tests: plate median exactness, NNF reuse determinism, shot-cut reset |
-| 2 | Orchestrator + chunked ffmpeg pipeline + worker pool, headless | object removed in test videos; **pixels outside the mask identical before encode**; fps/duration/frame count unchanged; audio stream preserved; flicker metric ≤ agreed threshold; cancel frees workers and memory; failure leaves original untouched |
-| 3 | UI (mode, keyframes, 2 s preview, progress/ETA, cancel, compare, apply) | desktop + 390 px e2e with real production build |
-| 4 | Save/lineage/isolation, limits and error cases (oversize, corrupt, OOM simulation, too-long clip) | mock e2e + live Supabase run (same pattern as Stage 1) with original byte-identical |
-| 5 | Docs, honest homepage text (only what is tested), completion report | all suites green, exact results reported |
+| **1. Test assets + metrics harness** | ffmpeg-generated clips with known ground truth: (a) static logo over moving background, (b) object moving over static background, (c) camera pan (limitation case), (d) shot cut, (e) occlusion/exit-reenter, (f) low-light noise; with and without audio. Python/Node metrics: object-gone, outside-mask pixel identity, flicker (temporal difference of the filled area vs ground-truth background), PSNR, audio/fps/duration/frame-count parity | Harness self-tests against ground truth (e.g. a perfect result scores perfect, a naive blur scores worse). Deterministic generation |
+| **2. Temporal core (pure)** | `temporal.ts` + core `init`/exemplar hooks | Unit tests: plate median exact when background visible; previous-frame init is deterministic and reduces flicker vs independent fill; shot-cut reset; camera-motion detector true/false cases; smoothing never touches pixels outside the mask. Stage 1 tests unchanged and green |
+| **3. Tracker (pure)** | template tracker, confidence, forward-backward check, keyframe interpolation/re-anchoring | Unit/synthetic tests: translation accuracy (sub-pixel error threshold), noise robustness, drift over 150 frames, **occlusion and exit are flagged, not tracked through**, keyframe re-anchoring recovers, interpolation correct, speed budget. **Gate: report accuracy numbers; your go/no-go before continuing** |
+| **4. Pipeline** | `videoCleanup.ts`, pool, chunked ffmpeg.wasm flow, limits, ETA, cancel | Headless-Chrome tests with real ffmpeg.wasm on M1 clips: object removed; **pixels outside the mask identical before encode**; fps/duration/frame count unchanged; audio stream preserved; flicker ≤ threshold; every limit refused with the right message; **cancel mid-chunk frees all workers/ffmpeg, original unchanged, a new run succeeds**; simulated OOM and corrupt input; measured time/memory recorded to confirm or adjust §3 |
+| **5. UI in the Video Editor** | mask on a paused frame, Track, low-confidence timeline with manual keyframes, 2-second preview, progress/ETA/Cancel, before/after, Apply/Discard, clear limitation messages | Production-build e2e (real `_headers`, mock Supabase): draw mask, track, fix a flagged frame, preview, apply, export validity (ffprobe), limits/errors, camera-move warning, cancel, **390 px mobile layout with touch**, existing editors not regressed |
+| **6. Save, lineage, live checks, docs** | save as `edit_kind='cleanup'`, `media:"video"`, lineage + compact settings; docs; homepage text only for what is tested | Mock e2e + GitHub-Actions live run with real Supabase (same pattern as Stage 1): copy row/lineage/private path, cross-account isolation, oversize/invalid kind, **original byte-identical (SHA-256) in storage**, valid MP4 downloads. Final report in the required 7-point format |
 
-Rough effort: M0–M2 are the risky part (temporal quality, memory); M3–M5 mirror Stage 1.
+Not testable here and stated as such in reports: real-phone speed/thermal behaviour, Netlify-specific behaviour (deploys stay off), user-perceived quality beyond the metrics.
 
-## 11. Risks
-- Flicker/ghosting on moving-camera footage (mitigated by detection + honest warning, not hidden).
-- ffmpeg.wasm memory/time on phones (mitigated by chunking, low limits, early refusal).
-- x264 re-encode is lossy: "pixels outside the mask unchanged" holds before encoding; after encoding we measure against an equally re-encoded original and say so.
-- Real-device speed unknown until tested.
+## 6. Risks
+- Tracker drift or failure on blur/occlusion → mitigated by confidence flags + manual keyframes; the gate after M3 decides whether to proceed.
+- ffmpeg.wasm memory/time on phones → chunking, low limits, early refusal.
+- x264 re-encode is lossy: "pixels outside the mask unchanged" is proven before encoding; after encoding we compare against an equally re-encoded original and say so.
+- Moving-camera footage will not be good; the UI says so.
 
-## 12. Out of scope for Stage 2
-Neural inpainting, server processing, audio cleanup, clips > limits, automatic object detection, any change to production deployment or `main`.
+## 7. Out of scope
+Neural inpainting, server processing, audio cleanup, clips over the limits, automatic object detection (the user marks the object), any production deployment or `main` change.
