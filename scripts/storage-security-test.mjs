@@ -151,6 +151,20 @@ try {
   check("B cannot read A's edited copy or its settings", !bSeesEdit.error && bSeesEdit.data.length === 0);
   const bLink = await uploadEdited(B, { source_file_id: up.row.id, edit_kind: "image", edit_params: {} }, "stolen-link.png");
   check("B cannot create a copy that points at A's original", !!bLink.error, bLink.error?.message);
+  // Stage 1 cleanup (object removal) copies: new edit_kind 'cleanup' with lineage and settings, same isolation rules
+  const clParams = { kind: "cleanup", cleanup: { engine: "patchmatch-inpaint", version: 1, ai: false, passes: [{ strokes: 2, maskPixels: 20904, roi: { x: 1, y: 2, w: 3, h: 4 } }] } };
+  const cl = await uploadEdited(A, { source_file_id: up.row.id, edit_kind: "cleanup", edit_params: clParams }, "cleaned.png");
+  check("A saves a cleanup copy linked to own original (edit_kind 'cleanup')", !cl.error && cl.row?.edit_kind === "cleanup" && cl.row?.source_file_id === up.row.id, cl.error?.message);
+  const clBack = await A.client.from("files").select("edit_params").eq("id", cl.row?.id ?? randomUUID()).single();
+  check("Cleanup settings (engine, passes, mask size) are stored with the copy", !clBack.error && deepEqual(clBack.data.edit_params, clParams), clBack.error?.message);
+  const bSeesCl = await B.client.from("files").select("id").eq("id", cl.row?.id ?? randomUUID());
+  check("B cannot read A's cleanup copy", !bSeesCl.error && bSeesCl.data.length === 0);
+  const bCl = await uploadEdited(B, { source_file_id: up.row.id, edit_kind: "cleanup", edit_params: clParams }, "stolen-cleanup.png");
+  check("B cannot create a cleanup copy pointing at A's original", !!bCl.error, bCl.error?.message);
+  const clBig = await uploadEdited(A, { source_file_id: up.row.id, edit_kind: "cleanup", edit_params: { pad: "x".repeat(9000) } }, "big-cleanup.png");
+  check("Oversized cleanup settings (> 8 KB) are rejected", !!clBig.error, clBig.error?.message);
+  const orig3 = await A.client.storage.from(BUCKET).download(up.path);
+  check("Original is untouched after saving a cleanup copy", !orig3.error && orig3.data?.size === up.bytes.length);
   const badKind = await uploadEdited(A, { source_file_id: up.row.id, edit_kind: "hack", edit_params: {} });
   check("Unknown edit_kind is rejected", !!badKind.error, badKind.error?.message);
   const noKind = await uploadEdited(A, { source_file_id: up.row.id, edit_params: {} });
