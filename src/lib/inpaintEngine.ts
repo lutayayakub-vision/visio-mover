@@ -29,6 +29,17 @@ export function cleanupLimits(profile: DeviceProfile = deviceProfile()): Cleanup
     : { maxImagePixels: 50 * MP, maxRoiPixels: 16 * MP, maxWorkPixels: 1_400_000 };
 }
 
+/**
+ * How many cleanups may be applied (stacked) in one editing session. Every applied cleanup keeps one full-size bitmap in
+ * memory so it can be undone, so the cap is the lower of a fixed 5 and what a per-device pixel budget allows
+ * (always at least 1). Desktop: 150 MP of stored bitmaps (~600 MB worst case). Mobile: 48 MP (~190 MB).
+ */
+export const MAX_CLEANUPS = 5;
+export function maxCleanups(imgW: number, imgH: number, profile: DeviceProfile = deviceProfile()): number {
+  const budget = profile.mobile ? 48_000_000 : 150_000_000;
+  return Math.max(1, Math.min(MAX_CLEANUPS, Math.floor(budget / Math.max(1, imgW * imgH))));
+}
+
 export type CleanupResult = {
   bitmap: ImageBitmap;
   stats: InpaintStats;

@@ -142,6 +142,47 @@ try {
   await page.goto(SITE + "/workspace", { waitUntil: "networkidle0" }); await page.waitForSelector(".frow");
   ok("Edited copy persists after refresh with EDITED tag", (await page.$$eval(".frow", (a) => a.map((x) => x.textContent))).some((t) => t.includes("(edited).webp") && t.includes("EDITED")));
 
+  // ═══ 3b. Object removal on the deployed site (real storage + real database) ═══
+  {
+    await uploadViaUi(page, `${FIX}/cleanup.png`, "cleanup.png");
+    const oCl = (await A.c.from("files").select("id, size_bytes, storage_path").eq("original_name", "cleanup.png").single()).data;
+    const origBytes = Buffer.from(await (await A.c.storage.from(BUCKET).download(oCl.storage_path)).data.arrayBuffer());
+    await page.click("a[aria-label='Edit cleanup.png']");
+    await page.waitForSelector("[data-tool='image']:not([hidden]) [data-testid=preview-stage] canvas", { timeout: 40000 }); await sleep(400);
+    await page.$eval("[data-testid=open-cleanup]", (b) => b.click());
+    await page.waitForSelector("[data-testid=cleanup-viewport]"); await sleep(300);
+    await page.$eval("[data-testid=brush-slider]", (e) => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(e, "120"); e.dispatchEvent(new Event("input", { bubbles: true })); });
+    await page.$eval("[data-testid=cleanup-viewport]", (e) => e.scrollIntoView({ block: "center", behavior: "instant" })); await sleep(100);
+    const r = await page.$eval("[data-testid=cleanup-viewport]", (e) => { const q = e.getBoundingClientRect(); return { x: q.x, y: q.y, w: q.width, h: q.height }; });
+    await page.mouse.move(r.x + r.w * 0.45, r.y + r.h * 0.5); await page.mouse.down(); await page.mouse.move(r.x + r.w * 0.55, r.y + r.h * 0.5, { steps: 8 }); await page.mouse.up(); await sleep(100);
+    await page.$eval("[data-testid=reconstruct]", (b) => b.click());
+    await page.waitForSelector("[data-testid=cleanup-candidate]", { timeout: 120000 });
+    ok("Live: reconstruction of a stored original produced a preview", true);
+    await page.$eval("[data-testid=cleanup-apply]", (b) => b.click()); await sleep(200);
+    await clickText(page, "[data-tool=image] .chip-btn", "PNG");
+    await page.$eval("[data-testid=process]", (b) => b.click());
+    await page.waitForSelector("[data-tool=image] [data-testid=result] img", { timeout: 60000 });
+    const dlC = `${OUT}/dl-cleanup`; await downloadDir(page, dlC);
+    await page.$eval("[data-testid=download]", (b) => b.click());
+    const fC = await waitFile(dlC);
+    const red = (f) => JSON.parse(execFileSync("python3", ["-I", "-c", "import sys,json;from PIL import Image;a=Image.open(sys.argv[1]).convert('RGB');p=a.load();print(json.dumps({'f':Image.open(sys.argv[1]).format,'w':a.size[0],'h':a.size[1],'red':sum(1 for y in range(270,331) for x in range(370,431) if p[x,y][0]>200 and p[x,y][1]<80 and p[x,y][2]<80)}))", f], { encoding: "utf8" }));
+    const dc = fC ? red(fC) : null;
+    ok("Live: downloaded cleaned image is a valid PNG with the object removed", !!dc && dc.f === "PNG" && dc.w === 800 && dc.h === 600 && dc.red < 20, JSON.stringify(dc));
+    await page.$eval("[data-testid=save]", (b) => b.click());
+    await page.waitForSelector("[data-tool=image] [data-testid=saved]", { timeout: 40000 });
+    const cl = await A.c.from("files").select("id, source_file_id, edit_kind, edit_params, storage_path, mime_type").eq("edit_kind", "cleanup");
+    ok("Live: cleanup copy row has edit_kind 'cleanup', lineage to the original, private path", cl.data?.length === 1 && cl.data[0].source_file_id === oCl.id && cl.data[0].storage_path.startsWith(A.id + "/") && cl.data[0].mime_type === "image/png", JSON.stringify(cl.error || ""));
+    ok("Live: cleanup settings stored (engine, non-AI flag, pass details)", cl.data?.[0]?.edit_params?.cleanup?.engine === "patchmatch-inpaint" && cl.data[0].edit_params.cleanup.ai === false && cl.data[0].edit_params.cleanup.passes?.length === 1 && cl.data[0].edit_params.cleanup.passes[0].maskPixels > 0);
+    const o3 = await A.c.from("files").select("size_bytes").eq("id", oCl.id).single();
+    const after = Buffer.from(await (await A.c.storage.from(BUCKET).download(oCl.storage_path)).data.arrayBuffer());
+    ok("Live: the original file is byte-for-byte unchanged in private storage", o3.data?.size_bytes === oCl.size_bytes && after.equals(origBytes), `${after.length} bytes`);
+    const saved = await A.c.storage.from(BUCKET).download(cl.data[0].storage_path);
+    ok("Live: saved cleanup copy downloads from private storage and is a valid PNG", !saved.error && Buffer.from(await saved.data.arrayBuffer()).subarray(1, 4).toString() === "PNG");
+    const bSees = await B.c.from("files").select("id").eq("id", cl.data[0].id);
+    ok("Live: B cannot read A's cleanup copy", !bSees.error && (bSees.data ?? []).length === 0);
+    await page.goto(SITE + "/workspace", { waitUntil: "networkidle0" }); await page.waitForSelector(".frow");
+  }
+
   // ═══ 4. Video editing on the deployed site ═══
   await page.click("a[aria-label='Edit clip.mp4']");
   await page.waitForSelector("[data-tool='video']:not([hidden]) [data-testid=source-video]", { timeout: 60000 });

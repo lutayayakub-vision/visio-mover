@@ -13,12 +13,11 @@ import {
 import { EditingError, downloadBlob, editedName, saveEditedCopy } from "../../lib/editing";
 import { formatBytes } from "../../lib/files";
 import CleanupStage, { useStrokes } from "./CleanupStage";
-import { CleanupError, ENGINE_NAME, ENGINE_VERSION, cleanupLimits, reconstruct, type CleanupResult } from "../../lib/inpaintEngine";
+import { CleanupError, ENGINE_NAME, ENGINE_VERSION, cleanupLimits, maxCleanups, reconstruct, type CleanupResult } from "../../lib/inpaintEngine";
 import { describeStrokes } from "../../lib/inpaint/strokes";
 
 type Version = { bitmap: ImageBitmap; work: ImageBitmap | HTMLCanvasElement; info: Record<string, unknown> };
 type Candidate = { res: CleanupResult; work: ImageBitmap | HTMLCanvasElement; info: Record<string, unknown> };
-const MAX_CLEANUPS = 5;
 
 type State = { ops: ImageOps; format: OutFormat; quality: number };
 const QUALITY_PRESETS = [{ id: "high", label: "High", v: 0.9 }, { id: "balanced", label: "Balanced", v: 0.75 }, { id: "small", label: "Small", v: 0.55 }];
@@ -110,6 +109,9 @@ export default function ImageEditor({ source, active, onReplace }: { source: Sou
   const [clError, setClError] = useState<string | null>(null);
   const [cand, setCand] = useState<Candidate | null>(null);
   const clCtl = useRef<AbortController | null>(null);
+  const runSeq = useRef(0);   // bumped whenever a running reconstruction must be ignored (new source, unmount)
+  const candRef = useRef<Candidate | null>(null);
+  candRef.current = cand;
   const top = cleaned.length ? cleaned[cleaned.length - 1] : null;
 
   const afterRef = useRef<HTMLCanvasElement>(null);
@@ -123,7 +125,8 @@ export default function ImageEditor({ source, active, onReplace }: { source: Sou
     let alive = true;
     let bmp: ImageBitmap | null = null;
     setDec(null); setWork(null); setLoadError(null); setResult(null); setSaved(null); setCropMode(false); setPrevDims(null);
-    cleanedRef.current.forEach((v) => v.bitmap.close()); setCleaned([]); setCand(null); setMode("adjust"); setClError(null); sel.clear();
+    runSeq.current++; clCtl.current?.abort(); candRef.current?.res.bitmap.close();
+    cleanedRef.current.forEach((v) => v.bitmap.close()); setCleaned([]); setCand(null); setRunning(false); setMode("adjust"); setClError(null); sel.clear();
     const base = formatExtFromName(source.file.name);
     restart({ ops: DEFAULT_OPS, format: base ?? "jpg", quality: 0.8 });
     decodeImage(source.file, profile)
@@ -138,7 +141,7 @@ export default function ImageEditor({ source, active, onReplace }: { source: Sou
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [source, profile, restart]);
 
-  useEffect(() => () => { if (url.current) URL.revokeObjectURL(url.current); cleanedRef.current.forEach((v) => v.bitmap.close()); clCtl.current?.abort(); }, []);
+  useEffect(() => () => { if (url.current) URL.revokeObjectURL(url.current); runSeq.current++; clCtl.current?.abort(); candRef.current?.res.bitmap.close(); cleanedRef.current.forEach((v) => v.bitmap.close()); }, []);
 
   // ───── live preview (small working copy; the full-size image is only touched on export) ─────
   const previewOps = useMemo<ImageOps>(() => ({ ...ops, resize: null, crop: cropMode ? null : ops.crop }), [ops, cropMode]);
@@ -281,11 +284,15 @@ export default function ImageEditor({ source, active, onReplace }: { source: Sou
 
   const runCleanup = async () => {
     if (!dec) return;
+    if (cleaned.length >= cap) { setClError(capMessage); return; }
+    const myRun = ++runSeq.current;
     setClError(null); setCand(null); setRunning(true); setClProgress({ f: 0, label: "Starting" });
     const c = new AbortController(); clCtl.current = c;
     try {
       const res = await reconstruct(top ? top.bitmap : dec.bitmap, sel.strokes, { profile, signal: c.signal, onProgress: (f, label) => setClProgress({ f, label }) });
+      if (myRun !== runSeq.current) { res.bitmap.close(); return; } // the source changed or the editor closed meanwhile
       const w = await makeWorkingCopy(res.bitmap, profile.previewSide);
+      if (myRun !== runSeq.current) { res.bitmap.close(); return; }
       const d = describeStrokes(sel.strokes);
       const info = {
         strokes: d.paintStrokes, erasedStrokes: d.eraseStrokes, brushMin: Math.round(d.brushMin), brushMax: Math.round(d.brushMax),
@@ -294,14 +301,15 @@ export default function ImageEditor({ source, active, onReplace }: { source: Sou
       };
       setCand({ res, work: w, info });
     } catch (e) {
+      if (myRun !== runSeq.current) return;
       if (e instanceof CleanupError && e.code === "cancelled") toast("info", "Reconstruction cancelled. Nothing was changed.");
       else setClError(e instanceof Error ? e.message : "Reconstruction failed. Nothing was changed.");
-    } finally { setRunning(false); clCtl.current = null; }
+    } finally { if (myRun === runSeq.current) { setRunning(false); clCtl.current = null; } }
   };
   const acceptCleanup = () => {
     if (!cand) return;
-    if (cleaned.length >= MAX_CLEANUPS) { setClError(`You can apply up to ${MAX_CLEANUPS} cleanups in one session. Save a copy, then open it to keep going.`); return; }
-    setCleaned((v) => [...v, { bitmap: cand.res.bitmap, work: cand.work, info: cand.info }]);
+    if (cleaned.length >= cap) { setClError(capMessage); return; }
+    setCleaned((v) => (v.length >= cap ? v : [...v, { bitmap: cand.res.bitmap, work: cand.work, info: cand.info }]));
     setCand(null); sel.clear(); setResult(null); setSaved(null);
     toast("success", "Cleanup applied. Your original file is unchanged.");
   };
@@ -312,6 +320,9 @@ export default function ImageEditor({ source, active, onReplace }: { source: Sou
   };
   const limits = cleanupLimits(profile);
   const tooBig = !!dec && dec.width * dec.height > limits.maxImagePixels;
+  const cap = dec ? maxCleanups(dec.width, dec.height, profile) : 1;
+  const atCap = cleaned.length >= cap;
+  const capMessage = `You can apply up to ${cap} cleanup${cap > 1 ? "s" : ""} to this image in one session. Save a copy, then open the copy to keep going.`;
 
   // ───── render ─────
   if (loadError) return <div className="panel card"><div className="empty" role="alert"><h3>This image can't be edited</h3><p>{loadError}</p><button className="btn btn-primary btn-md" onClick={onReplace}><span>Choose another image</span></button></div></div>;
@@ -408,10 +419,11 @@ export default function ImageEditor({ source, active, onReplace }: { source: Sou
           ) : (
             <>
               {tooBig && <p className="st-err" role="alert">This image is {(dec.width * dec.height / 1e6).toFixed(0)} megapixels; cleanup here supports up to {limits.maxImagePixels / 1e6}. Resize it, save the copy and open the copy.</p>}
+              {atCap && !cand && <p className="st-err" role="alert" data-testid="cleanup-cap">{capMessage}</p>}
               {!cand && !running && (
                 <>
                   <p className="st-note">1. Paint the area to remove. 2. Press Reconstruct. 3. Compare, then Apply or Discard.</p>
-                  <button className="btn btn-primary btn-md st-wide" onClick={runCleanup} disabled={!sel.strokes.length || tooBig} data-testid="reconstruct"><span>Reconstruct</span></button>
+                  <button className="btn btn-primary btn-md st-wide" onClick={runCleanup} disabled={!sel.strokes.length || tooBig || atCap} data-testid="reconstruct"><span>Reconstruct</span></button>
                   <button className="btn btn-ghost btn-sm" onClick={leaveCleanup} data-testid="cleanup-done"><span>{sel.strokes.length ? "Cancel selection" : "Close cleanup"}</span></button>
                 </>
               )}

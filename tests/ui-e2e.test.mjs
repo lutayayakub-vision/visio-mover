@@ -394,6 +394,124 @@ print(json.dumps({"size":a.size,"fmt":Image.open(sys.argv[1]).format,"outside":o
   await page.screenshot({ path: `${OUT}/cleanup-desktop-error.png`, fullPage: true });
 }
 
+// ════════════ OBJECT REMOVAL: review additions (formats, cancel, memory failure, cap, zoomed mapping, worker leaks) ════════════
+{
+  const rid = (n) => `aaaaaaaa-0000-4000-8000-00000000000${n}`;
+  const mk = (n, name, mime) => rows.push({ id: rid(n), owner_id: ME, storage_path: `${ME}/${name}`, original_name: name, category: "image", mime_type: mime, size_bytes: statSync(`${FIX}/${name}`).size, created_at: `2026-11-16T10:0${n}:00Z`, source_file_id: null, edit_kind: null, _file: name });
+  mk(4, "cleanup.jpg", "image/jpeg"); mk(5, "cleanup.webp", "image/webp"); mk(6, "big.jpg", "image/jpeg");
+  const setRange = (pg, sel, v) => pg.$eval(sel, (e, val) => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(e, String(val)); e.dispatchEvent(new Event("input", { bubbles: true })); }, v);
+  const centroid = (pg, sel, alphaOnly) => pg.$eval(sel, (c, a) => { const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data; let sx = 0, sy = 0, n = 0; for (let i = 0; i < d.length; i += 4) { const hit = a ? d[i + 3] > 0 : d[i] > 200 && d[i + 1] < 80 && d[i + 2] < 80; if (hit) { const p = i / 4; sx += p % c.width; sy += Math.floor(p / c.width); n++; } } return n ? [sx / n / c.width, sy / n / c.height, n] : [0, 0, 0]; }, alphaOnly);
+  const stroke = async (pg, pts, imgW, imgH) => {
+    await pg.$eval("[data-testid=cleanup-viewport]", (e) => e.scrollIntoView({ block: "center", behavior: "instant" })); await sleep(60);
+    const r = await pg.$eval("[data-testid=cleanup-viewport]", (e) => { const q = e.getBoundingClientRect(); return { x: q.x, y: q.y, w: q.width, h: q.height }; });
+    const P = ([x, y]) => [r.x + (x / imgW) * r.w, r.y + (y / imgH) * r.h]; const [a, ...rest] = pts.map(P);
+    await pg.mouse.move(...a); await pg.mouse.down(); for (const q of rest) await pg.mouse.move(...q, { steps: 6 }); await pg.mouse.up(); await sleep(60);
+  };
+  const redPy = (f) => JSON.parse(execFileSync("python3", ["-I", "-c", "import sys,json;from PIL import Image;a=Image.open(sys.argv[1]).convert('RGB');p=a.load();print(json.dumps({'f':Image.open(sys.argv[1]).format,'size':a.size,'red':sum(1 for y in range(270,331) for x in range(370,431) if p[x,y][0]>200 and p[x,y][1]<80 and p[x,y][2]<80)}))", f], { encoding: "utf8" }));
+  const sameAsPy = (f, g) => JSON.parse(execFileSync("python3", ["-I", "-c", "import sys,json;from PIL import Image,ImageChops;a=Image.open(sys.argv[1]).convert('RGB');b=Image.open(sys.argv[2]).convert('RGB');print(json.dumps({'same':a.size==b.size and ImageChops.difference(a,b).getbbox() is None}))", f, g], { encoding: "utf8" }));
+  const np = await newPage({ width: 1280, height: 900 });
+  await np.evaluateOnNewDocument(() => {
+    window.__w = { c: 0, t: 0 }; window.__failRead = false;
+    const W = window.Worker;
+    window.Worker = class extends W { constructor(...a) { super(...a); window.__w.c++; } terminate() { window.__w.t++; return super.terminate(); } };
+    for (const P of [CanvasRenderingContext2D.prototype, window.OffscreenCanvasRenderingContext2D?.prototype].filter(Boolean)) { const g = P.getImageData; P.getImageData = function (...a) { if (window.__failRead) throw new Error("simulated out of memory"); return g.apply(this, a); }; }
+  });
+  let wc = 0, wt = 0; // counters live in each document, so add them up before every navigation
+  const flush = async () => { const w = await np.evaluate(() => window.__w).catch(() => null); if (w) { wc += w.c; wt += w.t; } };
+  const openClean = async (id) => {
+    await flush();
+    await np.goto(BASE + `/image-editor?file=${id}`, { waitUntil: "networkidle0" });
+    await np.waitForSelector("[data-tool=image]:not([hidden]) [data-testid=preview-stage] canvas", { timeout: 60000 }); await sleep(300);
+    await np.$eval("[data-testid=open-cleanup]", (b) => b.click()); await np.waitForSelector("[data-testid=cleanup-viewport]"); await sleep(250);
+  };
+  const reconstructWait = async () => { await np.$eval("[data-testid=reconstruct]", (b) => b.click()); await np.waitForSelector("[data-testid=cleanup-candidate]", { timeout: 120000 }); };
+  const workers = () => np.evaluate(() => window.__w);
+
+  // 1. JPEG and WebP sources
+  for (const [n, name, chip, fmt] of [[4, "cleanup.jpg", "JPG", "JPEG"], [5, "cleanup.webp", "WEBP", "WEBP"]]) {
+    await openClean(rid(n)); await setRange(np, "[data-testid=brush-slider]", 120);
+    await stroke(np, [[360, 300], [440, 300]], 800, 600); await reconstructWait();
+    await np.$eval("[data-testid=cleanup-apply]", (b) => b.click()); await sleep(200);
+    await clickText(np, "[data-tool=image] .chip-btn", chip);
+    await np.$eval("[data-testid=process]", (b) => b.click());
+    await np.waitForSelector("[data-tool=image] [data-testid=result] img", { timeout: 30000 });
+    const dir = `${OUT}/dl-fmt-${n}`; await downloadDir(np, dir); await np.$eval("[data-testid=download]", (b) => b.click());
+    const f = await waitFile(dir); const r = f ? redPy(f) : null;
+    ok(`${name}: cleaned export is a valid ${fmt}, 800×600, object removed`, !!r && r.f === fmt && r.size[0] === 800 && r.size[1] === 600 && r.red < 60, JSON.stringify(r));
+  }
+
+  // 2. cancel a long reconstruction (24 MP photo, large selection)
+  await openClean(rid(6)); await setRange(np, "[data-testid=brush-slider]", 1200);
+  await stroke(np, [[1500, 2000], [4500, 2000]], 6000, 4000);
+  const w0 = await workers(); const up0 = uploads.length, in0 = inserts.length;
+  await np.$eval("[data-testid=reconstruct]", (b) => b.click());
+  await np.waitForSelector("[data-testid=cleanup-cancel]", { timeout: 30000 });
+  await np.$eval("[data-testid=cleanup-cancel]", (b) => b.click()); await sleep(600);
+  const w1 = await workers();
+  ok("Cancel: no result, no error, Reconstruct available again, selection kept", !(await np.$("[data-testid=cleanup-candidate]")) && !(await np.$("[data-testid=cleanup-error]")) && !(await np.$eval("[data-testid=reconstruct]", (b) => b.disabled)), "");
+  ok("Cancel: the background worker was terminated (no leak)", w1.c - w0.c === w1.t - w0.t && w1.c > w0.c - 0, `created ${w1.c - w0.c}, terminated ${w1.t - w0.t}`);
+  ok("Cancel: nothing applied, saved or uploaded", !(await np.$("[data-testid=cleanup-count]")) && uploads.length === up0 && inserts.length === in0, "");
+
+  // 3. simulated out-of-memory while reading the image, then prove the original is still exact
+  await openClean(rid(3)); await setRange(np, "[data-testid=brush-slider]", 120);
+  await stroke(np, [[360, 300], [440, 300]], 800, 600);
+  await np.evaluate(() => { window.__failRead = true; });
+  await np.$eval("[data-testid=reconstruct]", (b) => b.click());
+  await np.waitForSelector("[data-testid=cleanup-error]", { timeout: 30000 });
+  await np.evaluate(() => { window.__failRead = false; });
+  const msg = await np.$eval("[data-testid=cleanup-error]", (e) => e.textContent);
+  ok("Out-of-memory: clear message, no result, nothing applied", /memory|smaller/i.test(msg) && !(await np.$("[data-testid=cleanup-candidate]")) && !(await np.$("[data-testid=cleanup-count]")), msg);
+  await np.$eval("[data-testid=cleanup-done]", (b) => b.click()); await sleep(200);
+  await clickText(np, "[data-tool=image] .chip-btn", "PNG");
+  await np.$eval("[data-testid=process]", (b) => b.click());
+  await np.waitForSelector("[data-tool=image] [data-testid=result] img", { timeout: 30000 });
+  const dir3 = `${OUT}/dl-orig-after-fail`; await downloadDir(np, dir3); await np.$eval("[data-testid=download]", (b) => b.click());
+  const f3 = await waitFile(dir3);
+  ok("After a failed cleanup the image exports pixel-identical to the original", !!f3 && sameAsPy(f3, `${FIX}/cleanup.png`).same, "");
+
+  // 4. zoomed + panned selection lands exactly on what the user sees
+  await openClean(rid(3)); await setRange(np, "[data-testid=brush-slider]", 120);
+  for (let i = 0; i < 3; i++) await np.$eval("[aria-label='Zoom in']", (b) => b.click());
+  await clickText(np, "[data-tool=image] .cl-tools button", "Pan");
+  const vr = await np.$eval("[data-testid=cleanup-viewport]", (e) => { const q = e.getBoundingClientRect(); return { x: q.x, y: q.y, w: q.width, h: q.height }; });
+  await np.mouse.move(vr.x + vr.w * 0.5, vr.y + vr.h * 0.5); await np.mouse.down(); await np.mouse.move(vr.x + vr.w * 0.5 + 70, vr.y + vr.h * 0.5 - 40, { steps: 5 }); await np.mouse.up();
+  await clickText(np, "[data-tool=image] .cl-tools button", "Brush");
+  const disc = await centroid(np, "[data-testid=cleanup-viewport] canvas:not(.cl-mask)", false);
+  const cr = await np.$eval("[data-testid=cleanup-viewport] canvas:not(.cl-mask)", (c) => { const q = c.getBoundingClientRect(); return { x: q.x, y: q.y, w: q.width, h: q.height }; });
+  const sx = cr.x + disc[0] * cr.w, sy = cr.y + disc[1] * cr.h;
+  ok("Zoomed + panned: the red object is on screen", sx > vr.x && sx < vr.x + vr.w && sy > vr.y && sy < vr.y + vr.h, `${Math.round(sx)},${Math.round(sy)} in ${Math.round(vr.w)}x${Math.round(vr.h)}`);
+  await np.mouse.move(sx - 8, sy); await np.mouse.down(); await np.mouse.move(sx + 8, sy, { steps: 5 }); await np.mouse.up(); await sleep(80);
+  const mk2 = await centroid(np, "[data-testid=mask-canvas]", true);
+  ok("Zoomed + panned: the stroke is stored where the object really is (±1% of image)", Math.abs(mk2[0] - disc[0]) < 0.01 && Math.abs(mk2[1] - disc[1]) < 0.01, `disc ${disc.slice(0, 2).map((v) => v.toFixed(3))} mask ${mk2.slice(0, 2).map((v) => v.toFixed(3))}`);
+  await reconstructWait(); await np.$eval("[data-testid=cleanup-apply]", (b) => b.click()); await sleep(150);
+  await clickText(np, "[data-tool=image] .chip-btn", "PNG"); await np.$eval("[data-testid=process]", (b) => b.click());
+  await np.waitForSelector("[data-tool=image] [data-testid=result] img", { timeout: 30000 });
+  const dir4 = `${OUT}/dl-zoom`; await downloadDir(np, dir4); await np.$eval("[data-testid=download]", (b) => b.click());
+  const f4 = await waitFile(dir4); const r4 = f4 ? redPy(f4) : null;
+  ok("Zoomed + panned selection actually removed the object in the exported file", !!r4 && r4.red < 20, JSON.stringify(r4));
+
+  // 5. session cap: 5 applied cleanups, then blocked; saved settings stay under the DB limit
+  await openClean(rid(3)); await setRange(np, "[data-testid=brush-slider]", 30);
+  for (let i = 0; i < 5; i++) { await stroke(np, [[100 + i * 130, 120], [130 + i * 130, 120]], 800, 600); await reconstructWait(); await np.$eval("[data-testid=cleanup-apply]", (b) => b.click()); await sleep(150); }
+  await stroke(np, [[100, 500], [160, 500]], 800, 600);
+  ok("Cap: after 5 applied cleanups Reconstruct is disabled and says why", (await np.$eval("[data-testid=reconstruct]", (b) => b.disabled)) && /up to 5 cleanups/.test(await np.$eval("[data-testid=cleanup-cap]", (e) => e.textContent)), "");
+  await np.$eval("[data-testid=cleanup-done]", (b) => b.click()); await sleep(150);
+  ok("Cap: exactly 5 are recorded", (await np.$eval("[data-testid=cleanup-count]", (e) => e.textContent)).startsWith("5 cleanups applied"), "");
+  await np.$eval("[data-testid=process]", (b) => b.click());
+  await np.waitForSelector("[data-tool=image] [data-testid=result] img", { timeout: 30000 });
+  await np.$eval("[data-testid=save]", (b) => b.click()); await np.waitForSelector("[data-tool=image] [data-testid=saved]", { timeout: 20000 });
+  const i5 = inserts.at(-1);
+  ok("Cap: five-pass settings saved with lineage and stay under the 8 KB limit", i5.edit_kind === "cleanup" && i5.edit_params.cleanup.passes.length === 5 && JSON.stringify(i5.edit_params).length < 8000, `${JSON.stringify(i5.edit_params).length} bytes`);
+  await np.$eval("[data-testid=undo-applied]", (b) => b.click()); await sleep(150);
+  await np.$eval("[data-testid=open-cleanup]", (b) => b.click()); await sleep(150);
+  await stroke(np, [[100, 500], [160, 500]], 800, 600);
+  ok("Cap: undoing one frees a slot", !(await np.$eval("[data-testid=reconstruct]", (b) => b.disabled)), `${await np.$eval("[data-testid=cleanup-card]", (e) => e.innerText.replace(/\n/g, " | ").slice(0, 200))}`);
+
+  await flush();
+  ok("Every background worker that was started has been terminated (success, failure and cancel paths)", wc === wt && wc >= 9, `created ${wc}, terminated ${wt}`);
+  await np.close();
+}
+
 // ── mobile cleanup layout & touch drawing ──
 {
   const setRange = (pg, sel, v) => pg.$eval(sel, (e, val) => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(e, String(val)); e.dispatchEvent(new Event("input", { bubbles: true })); }, v);
@@ -420,6 +538,14 @@ print(json.dumps({"size":a.size,"fmt":Image.open(sys.argv[1]).format,"outside":o
   await t.end(); await sleep(100);
   const n = await m.$eval("[data-testid=mask-canvas]", (c) => { const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data; let k = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) k++; return k; });
   ok("mobile cleanup: finger painting creates a mask", n > 2000, `${n} overlay px`);
+  // two-finger pinch zooms and must not leave a stray stroke behind
+  const t1 = await m.touchscreen.touchStart(px(300), py(150)); const t2 = await m.touchscreen.touchStart(px(500), py(450));
+  for (let k = 1; k <= 6; k++) { await t1.move(px(300 - k * 20), py(150 - k * 10)); await t2.move(px(500 + k * 20), py(450 + k * 10)); }
+  await t1.end(); await t2.end(); await sleep(150);
+  const z = await m.$eval("[data-testid=zoom]", (e) => e.textContent);
+  const n2 = await m.$eval("[data-testid=mask-canvas]", (c) => { const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data; let k = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) k++; return k; });
+  ok("mobile cleanup: pinch zooms in and does not paint", parseInt(z) > 100 && n2 === n, `zoom ${z}, mask ${n} -> ${n2}`);
+  await clickText(m, "[data-tool=image] .cl-tools button", "Fit"); await sleep(100);
   await m.screenshot({ path: `${OUT}/cleanup-mobile.png`, fullPage: true });
   await m.$eval("[data-testid=reconstruct]", (b) => b.click());
   await m.waitForSelector("[data-testid=cleanup-candidate]", { timeout: 120000 });
