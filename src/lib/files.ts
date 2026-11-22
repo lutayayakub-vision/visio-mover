@@ -16,7 +16,7 @@ export type FileRecord = {
   created_at: string;
   /** Set when this file is an edited copy made in the Editing Studio (Stage 4). */
   source_file_id?: string | null;
-  edit_kind?: "image" | "video" | "thumbnail" | null;
+  edit_kind?: "image" | "video" | "thumbnail" | "cleanup" | null;
 };
 
 /** Per-file limits. The bucket itself also refuses anything over 50 MB (Supabase free-plan ceiling). */
@@ -138,7 +138,7 @@ export async function uploadObject(
 }
 
 /** Creates the searchable record. Size and type are re-read from storage by the database, not trusted from here. */
-export type EditMeta = { source_file_id: string | null; edit_kind: "image" | "video" | "thumbnail"; edit_params: Record<string, unknown> };
+export type EditMeta = { source_file_id: string | null; edit_kind: "image" | "video" | "thumbnail" | "cleanup"; edit_params: Record<string, unknown> };
 
 export async function registerFile(path: string, name: string, category: Category, mime: string, size: number, edit?: EditMeta): Promise<void> {
   const { error } = await supabase.from("files").insert({ storage_path: path, original_name: name, category, mime_type: mime, size_bytes: size, ...(edit ?? {}) });

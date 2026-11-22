@@ -93,3 +93,27 @@
   .st-h { width: 28px; height: 28px; margin: -14px 0 0 -14px; }
   .st-stage, .st-cropwrap { padding: var(--s-2); }
 }
+
+/* ───── cleanup (object removal) ───── */
+.cl-wrap { display: grid; gap: var(--s-2); }
+.cl-stage { display: grid; gap: var(--s-2); width: 100%; justify-items: center; }
+.cl-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--s-2) var(--s-3); width: 100%; }
+.cl-size { display: grid; gap: 2px; font-size: 0.8rem; min-width: 140px; }
+.cl-size input { width: 100%; min-height: 28px; }
+.cl-zoom { min-width: 3.2em; text-align: center; }
+.cl-fit { margin: 0 auto; max-width: 100%; }
+.cl-viewport { position: relative; width: 100%; overflow: hidden; touch-action: none; cursor: none; border-radius: var(--radius-sm); background: #111; user-select: none; -webkit-user-select: none; }
+.cl-viewport.is-pan { cursor: grab; }
+.cl-inner { position: absolute; inset: 0; transform-origin: 0 0; }
+.cl-layer { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.cl-mask { pointer-events: none; }
+.cl-cursor { position: absolute; border: 2px solid #fff; box-shadow: 0 0 0 1px #000; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; }
+.cl-cursor.is-erase { border-style: dashed; }
+.cl-hint { font-size: 0.8rem; text-align: center; margin: 0; }
+.cl-busy { position: absolute; left: 50%; bottom: var(--s-3); transform: translateX(-50%); display: flex; gap: 8px; align-items: center; padding: 6px 12px; border-radius: 999px; background: rgba(0,0,0,.75); color: #fff; font-size: .85rem; }
+.st-linkbtn { background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; color: inherit; font: inherit; }
+@media (max-width: 560px) {
+  .cl-tools { gap: var(--s-2); }
+  .cl-tools .btn { min-height: 40px; }
+  .cl-size { min-width: 100%; }
+}

@@ -12,6 +12,13 @@ import {
 } from "../../lib/imageEngine";
 import { EditingError, downloadBlob, editedName, saveEditedCopy } from "../../lib/editing";
 import { formatBytes } from "../../lib/files";
+import CleanupStage, { useStrokes } from "./CleanupStage";
+import { CleanupError, ENGINE_NAME, ENGINE_VERSION, cleanupLimits, reconstruct, type CleanupResult } from "../../lib/inpaintEngine";
+import { describeStrokes } from "../../lib/inpaint/strokes";
+
+type Version = { bitmap: ImageBitmap; work: ImageBitmap | HTMLCanvasElement; info: Record<string, unknown> };
+type Candidate = { res: CleanupResult; work: ImageBitmap | HTMLCanvasElement; info: Record<string, unknown> };
+const MAX_CLEANUPS = 5;
 
 type State = { ops: ImageOps; format: OutFormat; quality: number };
 const QUALITY_PRESETS = [{ id: "high", label: "High", v: 0.9 }, { id: "balanced", label: "Balanced", v: 0.75 }, { id: "small", label: "Small", v: 0.55 }];
@@ -57,6 +64,12 @@ function dragCrop(start: Crop, handle: Handle, dx: number, dy: number, lockPx: n
   return { x: l, y: t, w: r - l, h: b - t };
 }
 
+function Pic({ src, label }: { src: ImageBitmap | HTMLCanvasElement; label: string }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => { const c = ref.current; if (c) { c.width = src.width; c.height = src.height; c.getContext("2d")!.drawImage(src, 0, 0); } }, [src]);
+  return <canvas ref={ref} className="st-canvas" aria-label={label} />;
+}
+
 export default function ImageEditor({ source, active, onReplace }: { source: Source; active: boolean; onReplace: () => void }) {
   const toast = useToast();
   const profile = useMemo(() => deviceProfile(), []);
@@ -86,6 +99,19 @@ export default function ImageEditor({ source, active, onReplace }: { source: Sou
   const [saved, setSaved] = useState<string | null>(null);
   const saveCtl = useRef<AbortController | null>(null);
 
+  // ───── intelligent cleanup (inpainting) ─────
+  const [mode, setMode] = useState<"adjust" | "cleanup">("adjust");
+  const [cleaned, setCleaned] = useState<Version[]>([]);
+  const cleanedRef = useRef<Version[]>([]);
+  cleanedRef.current = cleaned;
+  const sel = useStrokes();
+  const [running, setRunning] = useState(false);
+  const [clProgress, setClProgress] = useState({ f: 0, label: "" });
+  const [clError, setClError] = useState<string | null>(null);
+  const [cand, setCand] = useState<Candidate | null>(null);
+  const clCtl = useRef<AbortController | null>(null);
+  const top = cleaned.length ? cleaned[cleaned.length - 1] : null;
+
   const afterRef = useRef<HTMLCanvasElement>(null);
   const cropFrameRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -97,6 +123,7 @@ export default function ImageEditor({ source, active, onReplace }: { source: Sou
     let alive = true;
     let bmp: ImageBitmap | null = null;
     setDec(null); setWork(null); setLoadError(null); setResult(null); setSaved(null); setCropMode(false); setPrevDims(null);
+    cleanedRef.current.forEach((v) => v.bitmap.close()); setCleaned([]); setCand(null); setMode("adjust"); setClError(null); sel.clear();
     const base = formatExtFromName(source.file.name);
     restart({ ops: DEFAULT_OPS, format: base ?? "jpg", quality: 0.8 });
     decodeImage(source.file, profile)
@@ -108,19 +135,21 @@ export default function ImageEditor({ source, active, onReplace }: { source: Sou
       })
       .catch((e: unknown) => { if (alive) setLoadError(e instanceof ImageError ? e.message : "This image couldn't be opened."); });
     return () => { alive = false; bmp?.close(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [source, profile, restart]);
 
-  useEffect(() => () => { if (url.current) URL.revokeObjectURL(url.current); }, []);
+  useEffect(() => () => { if (url.current) URL.revokeObjectURL(url.current); cleanedRef.current.forEach((v) => v.bitmap.close()); clCtl.current?.abort(); }, []);
 
   // ───── live preview (small working copy; the full-size image is only touched on export) ─────
   const previewOps = useMemo<ImageOps>(() => ({ ...ops, resize: null, crop: cropMode ? null : ops.crop }), [ops, cropMode]);
   useEffect(() => {
-    if (!work || !active) return;
+    const base = top ? top.work : work;
+    if (!base || !active) return;
     const c = new AbortController();
     setRendering(true);
     const t = setTimeout(async () => {
       try {
-        const { canvas, width, height } = await renderImage(work, previewOps, { signal: c.signal });
+        const { canvas, width, height } = await renderImage(base, previewOps, { signal: c.signal });
         if (c.signal.aborted) return;
         const target = cropMode ? cropFrameRef.current : afterRef.current;
         if (target) { target.width = width; target.height = height; target.getContext("2d")!.drawImage(canvas, 0, 0); }
@@ -130,7 +159,7 @@ export default function ImageEditor({ source, active, onReplace }: { source: Sou
       finally { if (!c.signal.aborted) setRendering(false); }
     }, 30);
     return () => { c.abort(); clearTimeout(t); };
-  }, [work, previewOps, cropMode, active, toast]);
+  }, [work, top, previewOps, cropMode, active, toast, mode, view]);
 
   const drawBefore = useCallback((el: HTMLCanvasElement | null) => {
     if (el && work) { const w = work as ImageBitmap; el.width = w.width; el.height = w.height; el.getContext("2d")!.drawImage(work, 0, 0); }
@@ -145,7 +174,7 @@ export default function ImageEditor({ source, active, onReplace }: { source: Sou
     return { w: c.w, h: c.h };
   }, [dec, ops.rotate, ops.crop]);
 
-  const key = JSON.stringify(st);
+  const key = JSON.stringify(st) + "|c" + cleaned.length;
   const stale = !!result && result.key !== key;
 
   // ───── editing actions ─────
@@ -216,7 +245,7 @@ export default function ImageEditor({ source, active, onReplace }: { source: Sou
     setProcError(null); setSaved(null); setResult(null); setBusy(true); setProgress(0);
     const c = new AbortController(); ctl.current = c;
     try {
-      const r = await exportImage(dec.bitmap, ops, { format: st.format, quality: st.quality }, { onProgress: setProgress, signal: c.signal, profile });
+      const r = await exportImage(top ? top.bitmap : dec.bitmap, ops, { format: st.format, quality: st.quality }, { onProgress: setProgress, signal: c.signal, profile });
       setResult({ r, key });
       if (url.current) URL.revokeObjectURL(url.current);
       url.current = URL.createObjectURL(r.blob); setResultUrl(url.current);
@@ -235,8 +264,10 @@ export default function ImageEditor({ source, active, onReplace }: { source: Sou
     try {
       const { name } = await saveEditedCopy({
         blob: result.r.blob, ext: result.r.ext, mime: result.r.mime, category: "image",
-        originalName: source.record?.original_name ?? source.file.name, sourceId: source.record?.id ?? null, kind: "image",
-        params: describeOps(ops, { format: st.format, quality: st.quality }, result.r), onProgress: setSaveProgress, signal: c.signal,
+        originalName: source.record?.original_name ?? source.file.name, sourceId: source.record?.id ?? null, kind: cleaned.length ? "cleanup" : "image",
+        params: cleaned.length
+          ? { ...describeOps(ops, { format: st.format, quality: st.quality }, result.r), kind: "cleanup", cleanup: { engine: ENGINE_NAME, version: ENGINE_VERSION, ai: false, passes: cleaned.map((v) => v.info) } }
+          : describeOps(ops, { format: st.format, quality: st.quality }, result.r), onProgress: setSaveProgress, signal: c.signal,
       });
       setSaved(name); toast("success", `Saved "${name}" to your workspace.`);
     } catch (e) {
@@ -244,6 +275,43 @@ export default function ImageEditor({ source, active, onReplace }: { source: Sou
       else toast("error", e instanceof EditingError || e instanceof Error ? e.message : "Couldn't save the copy.");
     } finally { setSaving(false); saveCtl.current = null; }
   };
+
+  const enterCleanup = () => { setCropMode(false); setClError(null); setMode("cleanup"); };
+  const leaveCleanup = () => { if (running) return; setMode("adjust"); };
+
+  const runCleanup = async () => {
+    if (!dec) return;
+    setClError(null); setCand(null); setRunning(true); setClProgress({ f: 0, label: "Starting" });
+    const c = new AbortController(); clCtl.current = c;
+    try {
+      const res = await reconstruct(top ? top.bitmap : dec.bitmap, sel.strokes, { profile, signal: c.signal, onProgress: (f, label) => setClProgress({ f, label }) });
+      const w = await makeWorkingCopy(res.bitmap, profile.previewSide);
+      const d = describeStrokes(sel.strokes);
+      const info = {
+        strokes: d.paintStrokes, erasedStrokes: d.eraseStrokes, brushMin: Math.round(d.brushMin), brushMax: Math.round(d.brushMax),
+        maskPixels: res.maskPixels, roi: res.roi, levels: res.stats.levels, iterations: res.stats.iterations, workScale: +res.stats.workScale.toFixed(3),
+        meanPatchError: +res.stats.meanPatchError.toFixed(2), ms: Math.round(res.ms), at: new Date().toISOString(),
+      };
+      setCand({ res, work: w, info });
+    } catch (e) {
+      if (e instanceof CleanupError && e.code === "cancelled") toast("info", "Reconstruction cancelled. Nothing was changed.");
+      else setClError(e instanceof Error ? e.message : "Reconstruction failed. Nothing was changed.");
+    } finally { setRunning(false); clCtl.current = null; }
+  };
+  const acceptCleanup = () => {
+    if (!cand) return;
+    if (cleaned.length >= MAX_CLEANUPS) { setClError(`You can apply up to ${MAX_CLEANUPS} cleanups in one session. Save a copy, then open it to keep going.`); return; }
+    setCleaned((v) => [...v, { bitmap: cand.res.bitmap, work: cand.work, info: cand.info }]);
+    setCand(null); sel.clear(); setResult(null); setSaved(null);
+    toast("success", "Cleanup applied. Your original file is unchanged.");
+  };
+  const discardCleanup = () => { cand?.res.bitmap.close(); setCand(null); };
+  const undoApplied = () => {
+    const v = cleanedRef.current[cleanedRef.current.length - 1]; if (!v) return;
+    v.bitmap.close(); setCleaned((x) => x.slice(0, -1)); setResult(null); setSaved(null);
+  };
+  const limits = cleanupLimits(profile);
+  const tooBig = !!dec && dec.width * dec.height > limits.maxImagePixels;
 
   // ───── render ─────
   if (loadError) return <div className="panel card"><div className="empty" role="alert"><h3>This image can't be edited</h3><p>{loadError}</p><button className="btn btn-primary btn-md" onClick={onReplace}><span>Choose another image</span></button></div></div>;
@@ -264,7 +332,7 @@ export default function ImageEditor({ source, active, onReplace }: { source: Sou
             <button className="btn btn-ghost btn-sm" onClick={redo} disabled={!canRedo || busy} aria-label="Redo"><span>Redo</span></button>
             <button className="btn btn-ghost btn-sm" onClick={reset} disabled={!(canUndo || changed) || busy}><span>Reset all</span></button>
           </div>
-          {!cropMode && (
+          {!cropMode && mode === "adjust" && (
             <div className="chips" role="group" aria-label="Preview mode">
               {([["compare", "Before / After"], ["after", "Edited"], ["before", "Original"]] as const).map(([id, l]) => (
                 <button key={id} className={`chip-btn ${view === id ? "on" : ""}`} aria-pressed={view === id} onClick={() => setView(id)}>{l}</button>
@@ -273,7 +341,18 @@ export default function ImageEditor({ source, active, onReplace }: { source: Sou
           )}
         </div>
 
-        {cropMode ? (
+        {mode === "cleanup" ? (
+          <div className="st-stage cl-wrap" data-testid="cleanup-stage">
+            {cand ? (
+              <div className="st-fit" style={{ width: `min(100%, ${(66 * (dec.width / dec.height)).toFixed(2)}vh)` }} data-testid="cleanup-compare">
+                <CompareSlider aspect={`${dec.width} / ${dec.height}`} before={<Pic src={top ? top.work : work} label="Before cleanup" />} after={<Pic src={cand.work} label="After cleanup (not applied yet)" />} beforeLabel="Before" afterLabel="After" />
+              </div>
+            ) : (
+              <CleanupStage display={top ? top.work : work} imgW={dec.width} imgH={dec.height} api={sel} disabled={running || tooBig} />
+            )}
+            {running && <div className="cl-busy" role="status"><Spinner size={18} /> {clProgress.label || "Working"}…</div>}
+          </div>
+        ) : cropMode ? (
           <div className="st-cropwrap">
             <div ref={stageRef} className="st-cropstage" style={{ aspectRatio: `${frame.w} / ${frame.h}`, width: `min(100%, ${(60 * frame.w / frame.h).toFixed(2)}vh)` }}>
               <canvas ref={cropFrameRef} className="st-canvas" aria-label="Image being cropped" />
@@ -315,6 +394,49 @@ export default function ImageEditor({ source, active, onReplace }: { source: Sou
       </section>
 
       <aside className="st-side" aria-label="Editing controls">
+        <section className="panel card st-card" data-testid="cleanup-card">
+          <h2>Remove objects</h2>
+          {mode === "adjust" ? (
+            <>
+              <p className="st-note">Paint over something you want gone (a stray person, a blemish, a watermark you own). VISIOMOVER rebuilds that area from the rest of the photo. Runs on your device; the image is never uploaded for this.</p>
+              <button className="btn btn-primary btn-md st-wide" onClick={enterCleanup} disabled={busy || saving} data-testid="open-cleanup"><span>Select area to remove</span></button>
+              {cleaned.length > 0 && (
+                <p className="st-good" data-testid="cleanup-count">{cleaned.length} cleanup{cleaned.length > 1 ? "s" : ""} applied.{" "}
+                  <button className="link st-linkbtn" onClick={undoApplied} disabled={busy} data-testid="undo-applied">Undo last cleanup</button></p>
+              )}
+            </>
+          ) : (
+            <>
+              {tooBig && <p className="st-err" role="alert">This image is {(dec.width * dec.height / 1e6).toFixed(0)} megapixels; cleanup here supports up to {limits.maxImagePixels / 1e6}. Resize it, save the copy and open the copy.</p>}
+              {!cand && !running && (
+                <>
+                  <p className="st-note">1. Paint the area to remove. 2. Press Reconstruct. 3. Compare, then Apply or Discard.</p>
+                  <button className="btn btn-primary btn-md st-wide" onClick={runCleanup} disabled={!sel.strokes.length || tooBig} data-testid="reconstruct"><span>Reconstruct</span></button>
+                  <button className="btn btn-ghost btn-sm" onClick={leaveCleanup} data-testid="cleanup-done"><span>{sel.strokes.length ? "Cancel selection" : "Close cleanup"}</span></button>
+                </>
+              )}
+              {running && (
+                <div className="st-busy">
+                  <ProgressBar value={clProgress.f} label={`Reconstructing: ${clProgress.label}`} />
+                  <button className="btn btn-ghost btn-sm" onClick={() => clCtl.current?.abort()} data-testid="cleanup-cancel"><span>Cancel</span></button>
+                </div>
+              )}
+              {cand && (
+                <div className="st-result" data-testid="cleanup-candidate">
+                  <b>Preview ready</b>
+                  <span className="st-muted">Drag the slider to compare. Only the selected area changed; the rest of the image is untouched. Not applied yet.</span>
+                  <div className="st-btnrow">
+                    <button className="btn btn-primary btn-sm" onClick={acceptCleanup} data-testid="cleanup-apply"><span>Apply</span></button>
+                    <button className="btn btn-ghost btn-sm" onClick={discardCleanup} data-testid="cleanup-discard"><span>Discard</span></button>
+                  </div>
+                </div>
+              )}
+              {clError && <p className="st-err" role="alert" data-testid="cleanup-error">{clError}</p>}
+            </>
+          )}
+        </section>
+
+        {mode === "adjust" && <>
         <section className="panel card st-card">
           <h2>Transform</h2>
           <div className="st-btnrow">
@@ -349,6 +471,8 @@ export default function ImageEditor({ source, active, onReplace }: { source: Sou
           ))}
         </section>
 
+        </>}
+
         <section className="panel card st-card">
           <h2>Export</h2>
           <div className="chips" role="group" aria-label="File format">
@@ -366,7 +490,7 @@ export default function ImageEditor({ source, active, onReplace }: { source: Sou
             </>
           ) : <p className="st-note">PNG is lossless, so there's no quality setting. Choose JPG or WEBP for smaller files.</p>}
 
-          {!busy && <button className="btn btn-primary btn-md st-wide" onClick={process} data-testid="process"><span>{result && !stale ? "Process again" : "Process image"}</span></button>}
+          {!busy && <button className="btn btn-primary btn-md st-wide" onClick={process} disabled={running || !!cand} data-testid="process"><span>{result && !stale ? "Process again" : "Process image"}</span></button>}
           {busy && (
             <div className="st-busy">
               <ProgressBar value={progress} label="Processing image" />
