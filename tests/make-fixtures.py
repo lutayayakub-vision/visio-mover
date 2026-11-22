@@ -58,3 +58,16 @@ subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "test
                 "-c:a", "aac", "-shortest", f"{out}/clip720.mp4"], check=True)
 open(f"{out}/fake.mp4", "w").write("this is not a video file at all")
 print("video fixtures ok")
+
+# cleanup.png/.jpg/.webp: 800x600 diagonal stripes + noise with ONE solid red disc (centre 400,300 r 45) = the "unwanted object"
+random.seed(7)
+c = Image.new("RGB", (800, 600))
+cp = c.load()
+for y in range(600):
+    for x in range(800):
+        s = 150 + (40 if ((x + y) // 24) % 2 else -40)
+        cp[x, y] = (max(0, min(255, s + random.randint(-8, 8))), max(0, min(255, s - 20 + random.randint(-8, 8))), max(0, min(255, s + 30 + random.randint(-8, 8))))
+ImageDraw.Draw(c).ellipse([400 - 45, 300 - 45, 400 + 45, 300 + 45], fill=(255, 0, 0))
+c.save(f"{out}/cleanup.png")
+c.save(f"{out}/cleanup.jpg", quality=95)
+c.save(f"{out}/cleanup.webp", quality=95)

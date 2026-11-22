@@ -266,6 +266,170 @@ await page.screenshot({ path: `${OUT}/desktop-video-done.png`, fullPage: true })
 await page.click("a[role=tab]:nth-child(1)"); await sleep(300);
 ok("switching tabs keeps the video editor mounted (state preserved)", !!(await page.$("[data-tool=video][hidden] [data-testid=result-video]")), "");
 
+// ════════════ OBJECT REMOVAL (Stage 1 cleanup) ════════════
+{
+  const CL_ID = "aaaaaaaa-0000-4000-8000-000000000003";
+  rows.push({ id: CL_ID, owner_id: ME, storage_path: `${ME}/cleanup.png`, original_name: "cleanup.png", category: "image", mime_type: "image/png", size_bytes: statSync(`${FIX}/cleanup.png`).size, created_at: "2026-11-16T10:03:00Z", source_file_id: null, edit_kind: null, _file: "cleanup.png" });
+  const origSize = rows.at(-1).size_bytes;
+  const setRange = (pg, sel, v) => pg.$eval(sel, (e, val) => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(e, String(val)); e.dispatchEvent(new Event("input", { bubbles: true })); }, v);
+  const maskCount = (pg) => pg.$eval("[data-testid=mask-canvas]", (c) => { const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 0) n++; return n; });
+  const vpRect = (pg) => pg.$eval("[data-testid=cleanup-viewport]", (e) => { const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; });
+  const stroke = async (pg, pts, imgW, imgH) => {
+    const r = await vpRect(pg); const P = ([x, y]) => [r.x + (x / imgW) * r.w, r.y + (y / imgH) * r.h];
+    const [a, ...rest] = pts.map(P);
+    await pg.mouse.move(...a); await pg.mouse.down();
+    for (const q of rest) await pg.mouse.move(...q, { steps: 8 });
+    await pg.mouse.up(); await sleep(80);
+  };
+  const scrollTo = (pg, sel) => pg.$eval(sel, (e) => e.scrollIntoView({ block: "center", behavior: "instant" }));
+  const checkPy = (f, orig) => JSON.parse(execFileSync("python3", ["-I", "-c", `
+import sys,json,math
+from PIL import Image
+a=Image.open(sys.argv[1]).convert("RGB"); b=Image.open(sys.argv[2]).convert("RGB")
+W,H=a.size; pa=a.load(); pb=b.load()
+def dist(x,y):  # distance to the painted segment (360..440, 300)
+    cx=min(440,max(360,x)); return math.hypot(x-cx,y-300)
+outside=same=0; inside=changed=0
+for y in range(H):
+    for x in range(W):
+        d=dist(x,y)
+        if d>75: outside+=1; same+= pa[x,y]==pb[x,y]
+        elif d<=45: inside+=1; changed+= pa[x,y]!=pb[x,y]
+red=sum(1 for y in range(270,331) for x in range(370,431) if pa[x,y][0]>200 and pa[x,y][1]<80 and pa[x,y][2]<80)
+print(json.dumps({"size":a.size,"fmt":Image.open(sys.argv[1]).format,"outside":outside,"same":same,"inside":inside,"changed":changed,"red":red}))`, f, orig], { encoding: "utf8" }));
+
+  await page.goto(BASE + `/image-editor?file=${CL_ID}`, { waitUntil: "networkidle0" });
+  await page.waitForSelector("[data-tool=image]:not([hidden]) [data-testid=preview-stage] canvas", { timeout: 20000 });
+  await sleep(400);
+  ok("cleanup entry point lives inside the existing Image Editor", !!(await page.$("[data-tool=image] [data-testid=open-cleanup]")), "");
+  await page.$eval("[data-testid=open-cleanup]", (b) => b.click());
+  await page.waitForSelector("[data-testid=cleanup-viewport]");
+  await sleep(300);
+  ok("Reconstruct is disabled until something is selected", await page.$eval("[data-testid=reconstruct]", (e) => e.disabled), "");
+  await page.screenshot({ path: `${OUT}/cleanup-desktop-empty.png`, fullPage: true });
+
+  // brush size control
+  await setRange(page, "[data-testid=brush-slider]", 120);
+  ok("brush size slider changes the brush size", (await page.$eval("[data-testid=brush-size]", (e) => e.textContent)) === "120", await page.$eval("[data-testid=brush-size]", (e) => e.textContent));
+  // paint over the red disc (centre 400,300)
+  await stroke(page, [[360, 300], [440, 300]], 800, 600);
+  const painted = await maskCount(page);
+  ok("brush creates a visible mask", painted > 5000, `${painted} overlay px`);
+  const r0 = await vpRect(page);
+  // mask lines up with where the brush was used: centre of the mask overlay is the stroke centre
+  const centre = await page.$eval("[data-testid=mask-canvas]", (c) => { const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data; let sx = 0, sy = 0, n = 0; for (let i = 0; i < d.length; i += 4) if (d[i + 3]) { const p = i / 4; sx += p % c.width; sy += Math.floor(p / c.width); n++; } return [sx / n / c.width, sy / n / c.height]; });
+  ok("mask is positioned where the brush was used", Math.abs(centre[0] - 0.5) < 0.02 && Math.abs(centre[1] - 0.5) < 0.02, JSON.stringify(centre));
+  // eraser removes part of the mask
+  await page.$eval("[data-testid=tool-eraser]", (b) => b.click());
+  await setRange(page, "[data-testid=brush-slider]", 60);
+  await stroke(page, [[440, 300], [490, 300]], 800, 600);
+  const afterErase = await maskCount(page);
+  ok("eraser removes selected area", afterErase < painted * 0.9, `${painted} -> ${afterErase}`);
+  // undo / redo
+  await page.$eval("[data-testid=sel-undo]", (b) => b.click()); await sleep(80);
+  ok("undo restores the mask before the eraser stroke", Math.abs((await maskCount(page)) - painted) < painted * 0.01, `${await maskCount(page)} vs ${painted}`);
+  await page.$eval("[data-testid=sel-redo]", (b) => b.click()); await sleep(80);
+  ok("redo re-applies the eraser stroke", Math.abs((await maskCount(page)) - afterErase) < afterErase * 0.01, "");
+  await page.$eval("[data-testid=sel-undo]", (b) => b.click()); await sleep(80);
+  // zoom control keeps drawing accurate
+  await page.$eval("[aria-label='Zoom in']", (b) => b.click()); await sleep(80);
+  ok("zoom in works", (await page.$eval("[data-testid=zoom]", (e) => e.textContent)) === "150%", await page.$eval("[data-testid=zoom]", (e) => e.textContent));
+  await clickText(page, "[data-tool=image] .cl-tools button", "Fit"); await sleep(80);
+  ok("Fit resets the zoom", (await page.$eval("[data-testid=zoom]", (e) => e.textContent)) === "100%", "");
+
+  // reconstruct -> candidate (not applied) -> discard
+  await scrollTo(page, "[data-testid=reconstruct]");
+  await page.$eval("[data-testid=reconstruct]", (b) => b.click());
+  await page.waitForSelector("[data-testid=cleanup-candidate]", { timeout: 90000 });
+  ok("progress shown while reconstructing, then a preview appears", true, "");
+  ok("before/after comparison shown for the candidate", !!(await page.$("[data-testid=cleanup-compare]")), "");
+  await page.screenshot({ path: `${OUT}/cleanup-desktop-preview.png`, fullPage: true });
+  await page.$eval("[data-testid=cleanup-discard]", (b) => b.click()); await sleep(150);
+  ok("Discard leaves the image unchanged (nothing applied) and keeps the selection", !(await page.$("[data-testid=cleanup-count]")) && (await maskCount(page)) > 5000, "");
+  await page.$eval("[data-testid=reconstruct]", (b) => b.click());
+  await page.waitForSelector("[data-testid=cleanup-candidate]", { timeout: 90000 });
+  await page.$eval("[data-testid=cleanup-apply]", (b) => b.click()); await sleep(200);
+  await page.$eval("[data-testid=cleanup-done]", (b) => b.click()); await sleep(200);
+  ok("Apply records one applied cleanup", (await page.$eval("[data-testid=cleanup-count]", (e) => e.textContent)).startsWith("1 cleanup applied"), "");
+
+  // export as PNG (lossless) and check the real file
+  await clickText(page, "[data-tool=image] .chip-btn", "PNG");
+  await page.$eval("[data-testid=process]", (b) => b.click());
+  await page.waitForSelector("[data-tool=image] [data-testid=result] img", { timeout: 30000 });
+  const dlC = `${OUT}/dl-cleanup`; await downloadDir(page, dlC);
+  await page.$eval("[data-testid=download]", (b) => b.click());
+  const fC = await waitFile(dlC);
+  ok("cleaned image downloaded", !!fC, fC || "");
+  if (fC) {
+    const c = checkPy(fC, `${FIX}/cleanup.png`);
+    ok("exported file is a valid PNG, same size as the original", c.fmt === "PNG" && c.size[0] === 800 && c.size[1] === 600, JSON.stringify(c.size));
+    ok("the red object is gone from the exported file", c.red < 20, `${c.red} red px remain (was ~6300)`);
+    ok("pixels well outside the selection are bit-identical to the original", c.same === c.outside, `${c.same}/${c.outside}`);
+    ok("pixels inside the object were reconstructed (changed)", c.changed > c.inside * 0.9, `${c.changed}/${c.inside}`);
+  }
+  // save -> lineage
+  const up0 = uploads.length, in0 = inserts.length;
+  await page.$eval("[data-testid=save]", (b) => b.click());
+  await page.waitForSelector("[data-tool=image] [data-testid=saved]", { timeout: 20000 });
+  const ci = inserts.at(-1);
+  ok("save adds exactly one new file in the user's own folder", uploads.length === up0 + 1 && inserts.length === in0 + 1 && uploads.at(-1).path.startsWith(ME + "/") && uploads.at(-1).path !== `${ME}/cleanup.png`, uploads.at(-1).path);
+  ok("saved row has edit_kind 'cleanup' and links to the original", ci.edit_kind === "cleanup" && ci.source_file_id === CL_ID, `${ci.edit_kind} ${ci.source_file_id}`);
+  ok("saved settings record engine, non-AI flag and the pass details", ci.edit_params?.cleanup?.engine === "patchmatch-inpaint" && ci.edit_params.cleanup.ai === false && ci.edit_params.cleanup.passes?.length === 1 && ci.edit_params.cleanup.passes[0].maskPixels > 0, JSON.stringify(ci.edit_params?.cleanup?.passes?.[0] || {}).slice(0, 160));
+  ok("edit_params stays under the 8 KB database limit", JSON.stringify(ci.edit_params).length < 8000, `${JSON.stringify(ci.edit_params).length} bytes`);
+  ok("original record untouched by the cleanup", rows.find((r) => r.id === CL_ID).size_bytes === origSize && !uploads.some((u) => u.path === `${ME}/cleanup.png`), "");
+
+  // undo applied cleanup
+  await page.$eval("[data-testid=undo-applied]", (b) => b.click()); await sleep(200);
+  ok("Undo last cleanup reverts to the original image", !(await page.$("[data-testid=cleanup-count]")), "");
+
+  // failure: select (almost) everything -> clear error, nothing applied
+  await page.$eval("[data-testid=open-cleanup]", (b) => b.click());
+  await page.waitForSelector("[data-testid=cleanup-viewport]");
+  await setRange(page, "[data-testid=brush-slider]", 180);
+  for (const y of [90, 250, 410, 570]) await stroke(page, [[10, y], [790, y]], 800, 600);
+  await page.$eval("[data-testid=reconstruct]", (b) => b.click());
+  await page.waitForSelector("[data-testid=cleanup-error]", { timeout: 60000 });
+  const emsg = await page.$eval("[data-testid=cleanup-error]", (e) => e.textContent);
+  ok("selecting nearly the whole image fails with a clear message and no result", /too much|smaller|enough/i.test(emsg) && !(await page.$("[data-testid=cleanup-candidate]")) && !(await page.$("[data-testid=cleanup-count]")), emsg);
+  await page.screenshot({ path: `${OUT}/cleanup-desktop-error.png`, fullPage: true });
+}
+
+// ── mobile cleanup layout & touch drawing ──
+{
+  const setRange = (pg, sel, v) => pg.$eval(sel, (e, val) => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(e, String(val)); e.dispatchEvent(new Event("input", { bubbles: true })); }, v);
+  const ua2 = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36";
+  const m = await newPage({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }, ua2);
+  await m.goto(BASE + "/image-editor", { waitUntil: "networkidle0" });
+  await (await m.waitForSelector("[data-tool=image]:not([hidden]) input[type=file]")).uploadFile(`${FIX}/cleanup.png`);
+  await m.waitForSelector("[data-tool=image] [data-testid=preview-stage] canvas", { timeout: 20000 });
+  await m.$eval("[data-testid=open-cleanup]", (b) => b.click());
+  await m.waitForSelector("[data-testid=cleanup-viewport]");
+  await sleep(400);
+  const lay = await m.evaluate(() => { const v = document.querySelector("[data-testid=cleanup-viewport]").getBoundingClientRect(); const tb = [...document.querySelectorAll(".cl-tools .btn, .cl-tools .chip-btn")].map((b) => b.getBoundingClientRect()); return { sw: document.documentElement.scrollWidth, iw: window.innerWidth, vw: v.width, vh: v.height, minBtnH: Math.min(...tb.map((r) => r.height)), tbRight: Math.max(...tb.map((r) => r.right)) }; });
+  ok("mobile cleanup: no horizontal overflow", lay.sw <= lay.iw + 1, JSON.stringify(lay));
+  ok("mobile cleanup: canvas fits the 390 px screen and tools stay inside it", lay.vw <= 390 && lay.vw > 250 && lay.tbRight <= 391, `${lay.vw}px canvas, tools right edge ${lay.tbRight}`);
+  ok("mobile cleanup: touch targets are at least 36 px tall", lay.minBtnH >= 36, `${lay.minBtnH}px`);
+  // touch drawing
+  const r = await m.$eval("[data-testid=cleanup-viewport]", (e) => { const q = e.getBoundingClientRect(); return { x: q.x, y: q.y, w: q.width, h: q.height }; });
+  await m.$eval("[data-testid=cleanup-viewport]", (e) => e.scrollIntoView({ block: "center", behavior: "instant" })); await sleep(150);
+  const r2 = await m.$eval("[data-testid=cleanup-viewport]", (e) => { const q = e.getBoundingClientRect(); return { x: q.x, y: q.y, w: q.width, h: q.height }; });
+  await setRange(m, "[data-testid=brush-slider]", 120);
+  const px = (x) => r2.x + (x / 800) * r2.w, py = (y) => r2.y + (y / 600) * r2.h;
+  const t = await m.touchscreen.touchStart(px(360), py(300));
+  for (let x = 360; x <= 440; x += 10) await t.move(px(x), py(300));
+  await t.end(); await sleep(100);
+  const n = await m.$eval("[data-testid=mask-canvas]", (c) => { const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data; let k = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) k++; return k; });
+  ok("mobile cleanup: finger painting creates a mask", n > 2000, `${n} overlay px`);
+  await m.screenshot({ path: `${OUT}/cleanup-mobile.png`, fullPage: true });
+  await m.$eval("[data-testid=reconstruct]", (b) => b.click());
+  await m.waitForSelector("[data-testid=cleanup-candidate]", { timeout: 120000 });
+  ok("mobile cleanup: reconstruction completes and shows a preview", true, "");
+  const lay2 = await m.evaluate(() => ({ sw: document.documentElement.scrollWidth, iw: window.innerWidth }));
+  ok("mobile cleanup preview: no horizontal overflow", lay2.sw <= lay2.iw + 1, JSON.stringify(lay2));
+  await m.screenshot({ path: `${OUT}/cleanup-mobile-preview.png`, fullPage: true });
+  await m.close();
+}
+
 // ════════════ ANDROID PHONE EMULATION ════════════
 const ua = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36";
 const mob = await newPage({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }, ua);

@@ -110,7 +110,8 @@ export async function reconstruct(
       else { cleanup(); reject(new CleanupError(m.code as CleanupErrorCode, m.message)); }
     };
     worker.onerror = () => { cleanup(); reject(new CleanupError("failed", "The background processor stopped unexpectedly. Nothing was changed.")); };
-    const msg: WorkerIn = { rgba: rgba.buffer as ArrayBuffer, mask: mask.buffer as ArrayBuffer, w: roi.w, h: roi.h, seed: opts.seed ?? 1337, maxWorkPixels: limits.maxWorkPixels };
+    // the mask is transferred to the worker (detaching it), so send a copy and keep ours for the paste-back step
+    const msg: WorkerIn = { rgba: rgba.buffer as ArrayBuffer, mask: mask.slice().buffer as ArrayBuffer, w: roi.w, h: roi.h, seed: opts.seed ?? 1337, maxWorkPixels: limits.maxWorkPixels };
     worker.postMessage(msg, [msg.rgba, msg.mask]);
   });
 
