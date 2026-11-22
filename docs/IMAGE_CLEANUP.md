@@ -23,7 +23,7 @@ Deterministic: fixed PRNG seed (1337), so the same selection gives the same resu
 | Max region processed | 16 MP | 5 MP |
 | Max synthesis resolution | 1.4 MP | 0.5 MP |
 
-Very large selections are synthesised at reduced resolution and upsampled (seams are still corrected at full resolution). Selecting more than 70 % of the image, or leaving fewer than ~20 usable source patches, fails with a clear message. Up to 5 applied cleanups per editing session. Supported formats: PNG, JPEG, WebP (corrupt/unsupported/oversized files are rejected by the existing image loader). Transparent pixels inside a selection are filled opaque.
+Very large selections are synthesised at reduced resolution and upsampled (seams are still corrected at full resolution). Selecting more than 70 % of the image, or leaving fewer than ~20 usable source patches, fails with a clear message. Applied cleanups per editing session: up to 5, fewer for very large images (each applied cleanup keeps one full-size bitmap so it can be undone; the cap is `min(5, memory budget / image pixels)`, never below 1; budget 150 MP desktop, 48 MP mobile). Reconstruct is disabled with an explanation once the cap is reached; undoing one frees a slot. Supported formats: PNG, JPEG, WebP (corrupt/unsupported/oversized files are rejected by the existing image loader). Transparent pixels inside a selection are filled opaque.
 
 ## Privacy, cost, dependencies
 - **Runs entirely in the browser.** The image is not uploaded to any service for cleanup. No API keys, no env vars, no model download, no cost.
