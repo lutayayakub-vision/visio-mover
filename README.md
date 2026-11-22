@@ -15,6 +15,9 @@ A secure workspace for cleaning unwanted marks from images, videos and documents
 
 The editors are placeholders and nothing is processed yet. See `ARCHITECTURE.md`.
 
+## Image cleanup / object removal
+Paint over an unwanted object in the Image Editor and rebuild the area from the rest of the photo (on-device PatchMatch inpainting, non-AI, no uploads, no API keys). Details, limits and tests: [`docs/IMAGE_CLEANUP.md`](docs/IMAGE_CLEANUP.md).
+
 ## Upload workspace (Stage 3)
 
 - Private bucket `visiomover-files`; every file lives at `<user-id>/<random-uuid>.<ext>`.

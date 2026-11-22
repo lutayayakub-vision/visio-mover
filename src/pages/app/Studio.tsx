@@ -10,7 +10,7 @@ import { type Category, type FileRecord } from "../../lib/files";
 
 type Tool = "image" | "video";
 const COPY: Record<Tool, { title: string; accept: string; hint: string; formats: string }> = {
-  image: { title: "Image Editor", accept: ".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp", hint: "Crop, resize, rotate, flip, adjust colour, compress and convert between JPG, PNG and WEBP.", formats: "JPG, PNG or WEBP" },
+  image: { title: "Image Editor", accept: ".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp", hint: "Crop, resize, rotate, flip, adjust colour, compress and convert between JPG, PNG and WEBP, and remove unwanted objects.", formats: "JPG, PNG or WEBP" },
   video: { title: "Video Editor", accept: ".mp4,.mov,.webm,video/mp4,video/quicktime,video/webm", hint: "Trim, cut, compress and export your videos, and capture thumbnails. Processing happens on your device.", formats: "MP4, MOV or WEBM" },
 };
 
