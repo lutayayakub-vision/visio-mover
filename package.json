@@ -11,7 +11,8 @@
     "test:storage": "node scripts/storage-security-test.mjs",
     "test:image": "node tests/image-engine.test.mjs",
     "test:video": "node tests/video-engine.test.mjs",
-    "test:ui": "npm run build && node tests/ui-e2e.test.mjs"
+    "test:ui": "npm run build && node tests/ui-e2e.test.mjs",
+    "test:inpaint": "tsx tests/inpaint-core.test.ts"
   },
   "keywords": [],
   "author": "",
@@ -32,6 +33,7 @@
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^6.3.0",
     "puppeteer-core": "^25.17.0",
+    "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vite": "^8.3.8",
     "vite-plugin-singlefile": "^2.3.4"
