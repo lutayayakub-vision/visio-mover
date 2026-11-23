@@ -23,6 +23,9 @@ export class InpaintError extends Error {
 
 export type Progress = (fraction: number, label: string) => void;
 export type InpaintOptions = {
+  /** Optional starting estimate for the hole (RGBA, same size as the region). When given, the coarse-to-fine pyramid is skipped and
+   *  the finest level is refined from this estimate, so a video frame stays close to the previous frame's fill (temporal seeding). */
+  init?: Uint8ClampedArray;
   seed?: number;
   /** patch radius, 3 = 7x7 patches */
   patchRadius?: number;
@@ -33,7 +36,7 @@ export type InpaintOptions = {
 };
 export type InpaintStats = {
   holePixels: number; roiPixels: number; workScale: number; levels: number; iterations: number; validSources: number;
-  meanPatchError: number; seamCorrected: boolean; ms: number;
+  meanPatchError: number; seamCorrected: boolean; ms: number; seeded: boolean;
 };
 
 type Level = { w: number; h: number; img: Uint8ClampedArray; hole: Uint8Array };
@@ -342,8 +345,16 @@ export function inpaintRoi(rgba: Uint8ClampedArray, mask: Uint8Array, w: number,
   while (levels.length > 1 && geoms[levels.length - 1].validList.length < 8) { levels.pop(); geoms.pop(); }
   if (geoms[0].validList.length < 20) throw new InpaintError("no_source", "There isn't enough unselected picture around this area to copy from. Select a smaller area, or one with more background around it.");
 
-  const top = levels.length - 1;
-  diffuseFill(levels[top]);
+  let top = levels.length - 1;
+  const seeded = !!opts.init;
+  if (opts.init) {
+    if (opts.init.length !== w * h * 4) throw new InpaintError("bad_input", "The starting estimate and the image region don't match.");
+    const initRgb = rgbaToRgb(opts.init, w * h);
+    const wi = scale === 1 ? initRgb : resizeRgb(initRgb, w, h, ww, wh);
+    levels.length = 1; geoms.length = 1; top = 0;
+    const L0 = levels[0], hl = geoms[0].holeList;
+    for (let i = 0; i < hl.length; i++) { const p = hl[i] * 3; L0.img[p] = wi[p]; L0.img[p + 1] = wi[p + 1]; L0.img[p + 2] = wi[p + 2]; }
+  } else diffuseFill(levels[top]);
   const rnd = mulberry32(opts.seed ?? 1337);
 
   // work totals for progress
@@ -431,5 +442,5 @@ export function inpaintRoi(rgba: Uint8ClampedArray, mask: Uint8Array, w: number,
     out[o] = r; out[o + 1] = g; out[o + 2] = b; out[o + 3] = 255;
   }
   progress(1, "Done");
-  return { rgba: out, stats: { holePixels: holeCount, roiPixels: w * h, workScale: +scale.toFixed(3), levels: levels.length, iterations: iterCount, validSources: geoms[0].validList.length, meanPatchError: +lastError.toFixed(2), seamCorrected: seam, ms: Math.round(now() - t0) } };
+  return { rgba: out, stats: { holePixels: holeCount, roiPixels: w * h, workScale: +scale.toFixed(3), levels: levels.length, iterations: iterCount, validSources: geoms[0].validList.length, meanPatchError: +lastError.toFixed(2), seamCorrected: seam, ms: Math.round(now() - t0), seeded } };
 }

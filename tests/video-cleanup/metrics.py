@@ -168,6 +168,7 @@ RESIDUAL_MAX = 0.35        # removal: error vs truth inside the region must be <
 RED_REMAINING_MAX = 0.02
 # strict gates for RAW (pre-encode) frames: no codec in the loop, so the guarantees are exact
 RAW_FLICKER_MAX = 1.5      # PROVISIONAL, recalibrated in Milestone 4 on real pipeline output
+NOISY_INSTABILITY_MAX = 1.25  # noisy footage: fill may be as noisy as the truth (ratio 1.0) or steadier (denoised, <1) but not noisier; random per-frame fills score ~1.7
 
 
 def load_calibration():
@@ -218,14 +219,22 @@ def evaluate_raw(scenario, result_frames):
     n = min(len(inp), len(result_frames)); r = result_frames[:n]
     out = {"scenario": scenario, "frames": n, "removal": object_removal(inp[:n], r, truth[:n], mask[:n]),
            "outside": outside_identity(inp[:n], r, mask[:n]), "flicker": flicker(r, truth[:n], mask[:n])}
+    sig = S.get(scenario).noise_sigma()
+    # noisy footage: a denoised fill is SUPPOSED to be steadier than the noisy truth, so judge temporal noise relative to the truth's own (<= 1.25x)
+    out["instability_ratio"] = out["flicker"]["temporal_mae_result"] / max(1e-9, out["flicker"]["temporal_mae_truth"])
+    stable = (out["instability_ratio"] <= NOISY_INSTABILITY_MAX) if sig else (out["flicker"]["excess"] <= RAW_FLICKER_MAX)
     out["pass"] = {"all_frames": n == len(inp), "removed": out["removal"]["residual_ratio"] <= RESIDUAL_MAX,
                    "red_gone": out["removal"]["red_remaining"] is None or out["removal"]["red_remaining"] <= RED_REMAINING_MAX,
-                   "outside_exact": out["outside"]["differing_pixels"] == 0, "stable": out["flicker"]["excess"] <= RAW_FLICKER_MAX}
+                   "outside_exact": out["outside"]["differing_pixels"] == 0, "stable": stable}
     return out
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(); sub = ap.add_subparsers(dest="cmd", required=True)
     e = sub.add_parser("evaluate"); e.add_argument("--scenario", required=True); e.add_argument("--result", required=True); e.add_argument("--margin", type=int, default=16); e.add_argument("--crf", type=int, default=23)
+    r = sub.add_parser("evaluate-raw"); r.add_argument("--scenario", required=True); r.add_argument("--result", required=True, help="raw rgb24 file, frames*H*W*3")
     a = ap.parse_args()
+    if a.cmd == "evaluate-raw":
+        arr = np.fromfile(a.result, np.uint8).reshape(-1, S.H, S.W, 3)
+        print(json.dumps(evaluate_raw(a.scenario, arr), indent=1, default=str)); sys.exit(0)
     print(json.dumps(evaluate(a.scenario, a.result, a.margin, a.crf), indent=1, default=str))

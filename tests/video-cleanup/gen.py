@@ -72,12 +72,27 @@ def export_truth(name, out):
         Image.fromarray((mask[t] * 255).astype(np.uint8)).save(os.path.join(out, f"mask_{t:04d}.png"))
 
 
+def export_raw(name, out):
+    """Raw RGB/mask dumps for the TypeScript tests (no ffmpeg involved, so results are exact)."""
+    inp, truth, mask = S.render_all(name)
+    d = os.path.join(out, name); os.makedirs(d, exist_ok=True)
+    np.ascontiguousarray(inp).tofile(os.path.join(d, "input.rgb"))
+    np.ascontiguousarray(mask.astype(np.uint8)).tofile(os.path.join(d, "mask.u8"))
+    with open(os.path.join(d, "info.json"), "w") as f:
+        json.dump({"name": name, "w": S.W, "h": S.H, "frames": len(inp)}, f)
+    return d
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--only"); ap.add_argument("--export-truth"); ap.add_argument("--out", default=OUT)
+    ap.add_argument("--only"); ap.add_argument("--export-raw", action="store_true"); ap.add_argument("--export-truth"); ap.add_argument("--out", default=OUT)
     a = ap.parse_args()
     if a.export_truth:
         export_truth(a.export_truth, a.out); print("exported", a.export_truth, "->", a.out); sys.exit(0)
+    if a.export_raw:
+        for n in ([a.only] if a.only else S.names()):
+            print("raw", n, "->", export_raw(n, a.out))
+        sys.exit(0)
     for n in ([a.only] if a.only else S.names()):
         d, m = build(n, a.out)
         print(f"{n}: {m['frames']} frames, audio={m['audio']}, reveal static={m['reveal']['static']:.2f} motion={m['reveal']['motion_compensated']:.2f} -> {d}")

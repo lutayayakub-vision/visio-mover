@@ -91,3 +91,6 @@ Not testable here and stated as such in reports: real-phone speed/thermal behavi
 
 ## 7. Out of scope
 Neural inpainting, server processing, audio cleanup, clips over the limits, automatic object detection (the user marks the object), any production deployment or `main` change.
+
+## M2 implementation note (as built)
+`src/lib/inpaint/temporal.ts`: global-translation motion per frame pair (masked areas ignored; "still" preferred when it explains the picture as well as the best shift), rigid-motion check (64×64 block agreement), shot cuts by block-mean mismatch, per-shot cumulative motion, motion-compensated per-pixel median plate (nearest frames first), coverage policy (default: refuse with `insufficient_background`; opt-in `spatial` → status `degraded`), Stage 1 PatchMatch fallback seeded from the previous frame (`init` hook in `core.ts`), exact outside-copy verified before returning. Integer-pixel global translation only; zoom/rotation/parallax are detected as unreliable, not compensated. Results: `tests/video-cleanup/last-m2-result.txt`. Run: `npm run test:vc-temporal`.

@@ -128,4 +128,4 @@ PASS  lowlight_noise: a cleaner that blacks out pixels OUTSIDE the object FAILS 
 PASS  lowlight_noise: an unchanged clip FAILS the removal gate (cannot be fooled)  [residual 1.00]
 PASS  post-encode gate FAILS a cleaner that drops the audio track
 
-123/123 passed  (226s)
+123/123 passed  (282s)

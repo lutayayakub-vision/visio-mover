@@ -13,7 +13,8 @@
     "test:video": "node tests/video-engine.test.mjs",
     "test:ui": "npm run build && node tests/ui-e2e.test.mjs",
     "test:inpaint": "tsx tests/inpaint-core.test.ts && tsx tests/inpaint-engine.test.ts",
-    "test:vc-harness": "python3 tests/video-cleanup/selftest.py"
+    "test:vc-harness": "python3 tests/video-cleanup/selftest.py",
+    "test:vc-temporal": "tsx tests/temporal.test.ts"
   },
   "keywords": [],
   "author": "",

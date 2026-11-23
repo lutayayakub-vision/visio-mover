@@ -1,0 +1,93 @@
+PASS  A/moving_object: succeeds (fixed camera, object moves over a static background)  — status=ok
+PASS  A/moving_object: object removed (residual 0.000 ≤ 0.35, red left 0)
+PASS  A/moving_object: every pixel outside the selection identical to input (0 differ of 20316324)
+PASS  A/moving_object: temporally stable (excess 0.000, instability 0.000)
+PASS  A/moving_object: all frames returned
+PASS  A/moving_object: status ok and no false alarm  — warnings=[]
+PASS  A/long_track: succeeds (fixed camera, long figure-8 track (150 frames))  — status=ok
+PASS  A/long_track: object removed (residual 0.000 ≤ 0.35, red left 0)
+PASS  A/long_track: every pixel outside the selection identical to input (0 differ of 33931306)
+PASS  A/long_track: temporally stable (excess 0.000, instability 0.000)
+PASS  A/long_track: all frames returned
+PASS  A/long_track: status ok and no false alarm  — warnings=[]
+PASS  A/static_logo: succeeds (moving background, fixed overlay (motion-compensated))  — status=ok
+PASS  A/static_logo: object removed (residual 0.000 ≤ 0.35, red left 0)
+PASS  A/static_logo: every pixel outside the selection identical to input (0 differ of 20045430)
+PASS  A/static_logo: temporally stable (excess 0.003, instability 1.000)
+PASS  A/static_logo: all frames returned
+PASS  A/static_logo: status ok and no false alarm  — warnings=[spatial_fallback,scene_in_motion]
+PASS  A/static_logo: warns 'scene_in_motion'
+PASS  A/occlusion: succeeds (object leaves and re-enters behind an occluder)  — status=ok
+PASS  A/occlusion: object removed (residual 0.000 ≤ 0.35, red left 0)
+PASS  A/occlusion: every pixel outside the selection identical to input (0 differ of 27358469)
+PASS  A/occlusion: temporally stable (excess 0.000, instability 0.000)
+PASS  A/occlusion: all frames returned
+PASS  A/occlusion: status ok and no false alarm  — warnings=[]
+PASS  A/lowlight_noise: succeeds (low light, sensor noise σ=9)  — status=ok
+PASS  A/lowlight_noise: object removed (residual 0.189 ≤ 0.35, red left n/a)
+PASS  A/lowlight_noise: every pixel outside the selection identical to input (0 differ of 20316771)
+PASS  A/lowlight_noise: temporally stable (excess 10.198, instability 0.049)
+PASS  A/lowlight_noise: all frames returned
+PASS  A/lowlight_noise: status ok and no false alarm  — warnings=[]
+PASS  A/shot_cut: succeeds (shot cut in the middle)  — status=ok
+PASS  A/shot_cut: object removed (residual 0.000 ≤ 0.35, red left 0)
+PASS  A/shot_cut: every pixel outside the selection identical to input (0 differ of 20317368)
+PASS  A/shot_cut: temporally stable (excess 0.000, instability 1.000)
+PASS  A/shot_cut: all frames returned
+PASS  A/shot_cut: status ok and no false alarm  — warnings=[shot_cut]
+PASS  A/shot_cut: warns 'shot_cut'
+PASS  A/shot_cut: two segments split exactly at the cut [0-44][45-89]  — [[0,44],[45,89]]
+PASS  A/lowlight_noise: no false shot cut or camera-motion alarm
+PASS  A/camera_pan: refused with insufficient_background (no invented result)  — Can't reconstruct reliably: The object seems to move together with the scene (for example a camera pan), so the picture 
+PASS  A/camera_pan: message says nothing was changed and names the cause
+PASS  A/camera_pan: detail reports camera motion and 0% coverage
+PASS  A/camera_pan opt-in: result is 'degraded', never 'ok'  — status=degraded
+PASS  A/camera_pan opt-in: warns spatial_fallback + object_moves_with_background
+PASS  A/camera_pan opt-in: still exact outside the selection  — 0 differ
+PASS  B/fixed camera: result status ok, plate reproduces the true background exactly
+PASS  B/inputs are never modified (frames and masks byte-identical afterwards)
+PASS  B/outside the selection: every byte equals the input, all frames
+PASS  B/deterministic: two runs give byte-identical frames
+PASS  B/a frame with nothing selected is returned unchanged
+PASS  B/one frame only: refuses (insufficient_background), invents nothing
+PASS  B/static object on a static scene: refused with a clear message  — Can't reconstruct reliably: The area behind the object is hidden in (almost) every frame, so the vid
+PASS  B/…opt-in spatial: status 'degraded' with spatial_fallback warning, never 'ok'
+PASS  B/…opt-in spatial: pixels outside the selection still exact
+PASS  B/object that later leaves: background taken from the later frames (exact)
+PASS  B/moving background: motion measured as 3 px/frame in every step  — [[3,0],[3,0],[3,0]]
+PASS  B/moving background: 100.00% of hidden pixels recovered within 6 levels (≥ 98%)
+PASS  B/zoom: refused (insufficient_background) and flags unreliable motion  — unreliable at 11 steps
+PASS  B/zoom opt-in: degraded with unreliable_motion + spatial_fallback warnings
+PASS  B/shot cut: scene A is NOT filled from scene B (refused; cut reported at frame 14)
+PASS  B/shot cut: even with cut detection off, unmeasurable motion stops information crossing the cut
+PASS  B/shot cut: each shot reconstructed from its own frames only (exact), cut at 12 reported  — [[0,11],[12,23]]
+PASS  B/estimateMotion: finds a (4,-3) shift exactly  — got (4,-3) valid=true
+PASS  B/estimateMotion: identical frames → no motion, valid
+PASS  B/estimateMotion: a flat picture is treated as still (nothing to follow)
+PASS  B/seeding: deterministic (two seeded runs byte-identical)
+PASS  B/seeding: later frames were actually seeded from the previous result  — seeded frames=9
+PASS  B/seeding: flicker vs true motion not worse than independent fills (seeded 15.80 vs independent 26.67)
+PASS  B/bad input: nothing selected anywhere → bad_input
+PASS  B/bad input: no frames → bad_input
+PASS  B/bad input: mask count ≠ frame count → bad_input
+PASS  B/bad input: wrong frame size → bad_input
+PASS  B/bad input: wrong mask size → bad_input
+PASS  B/cancel: stops promptly with code 'cancelled'  — checks=4
+PASS  B/cancel: a running job stops within ~1 s of the request  — 326 ms
+PASS  B/progress: monotonic and ends at 1
+
+BENCH (each scenario in its own process; ms includes motion search, plate and composition; RSS is the process peak):
+┌─────────┬─────────────────────────────────────────┬────────┬───────┬──────────┬─────────────┬─────────────────┐
+│ (index) │ scenario                                │ frames │ ms    │ ms/frame │ peak RSS MB │ baseline RSS MB │
+├─────────┼─────────────────────────────────────────┼────────┼───────┼──────────┼─────────────┼─────────────────┤
+│ 0       │ 'moving_object'                         │ 90     │ 14170 │ 157.4    │ 325         │ 170             │
+│ 1       │ 'long_track'                            │ 150    │ 23388 │ 155.9    │ 469         │ 237             │
+│ 2       │ 'static_logo'                           │ 90     │ 14514 │ 161.3    │ 319         │ 170             │
+│ 3       │ 'occlusion'                             │ 120    │ 18303 │ 152.5    │ 382         │ 205             │
+│ 4       │ 'lowlight_noise'                        │ 90     │ 17641 │ 196      │ 325         │ 171             │
+│ 5       │ 'shot_cut'                              │ 90     │ 14548 │ 161.6    │ 319         │ 171             │
+│ 6       │ 'camera_pan (refused)'                  │ 90     │ 13182 │ 146.5    │ 207         │ 170             │
+│ 7       │ 'camera_pan (opt-in spatial, degraded)' │ 90     │ 20345 │ 226.1    │ 318         │ 170             │
+└─────────┴─────────────────────────────────────────┴────────┴───────┴──────────┴─────────────┴─────────────────┘
+
+77/77 passed
