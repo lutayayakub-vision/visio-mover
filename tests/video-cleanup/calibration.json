@@ -1,0 +1,49 @@
+{
+ "ffmpeg": "ffmpeg version 6.1.1-3ubuntu5 Copyright (c) 2000-2023 the FFmpeg developers",
+ "crf": 23,
+ "rules": "outside_psnr >= perfect_outside_psnr - 3 ; flicker <= 2*bias_flicker + 0.5 (bias fill = truth + bias_level inside the object)",
+ "scenarios": {
+  "static_logo": {
+   "perfect_outside_psnr": 37.36,
+   "bias_flicker": 2.81,
+   "bias_residual": 0.186,
+   "truth_motion": 9.68
+  },
+  "moving_object": {
+   "perfect_outside_psnr": 38.03,
+   "bias_flicker": 0.929,
+   "bias_residual": 0.207,
+   "truth_motion": 0.024
+  },
+  "camera_pan": {
+   "perfect_outside_psnr": 41.48,
+   "bias_flicker": 1.668,
+   "bias_residual": 0.189,
+   "truth_motion": 1.543
+  },
+  "shot_cut": {
+   "perfect_outside_psnr": 39.28,
+   "bias_flicker": 1.073,
+   "bias_residual": 0.198,
+   "truth_motion": 0.322
+  },
+  "occlusion": {
+   "perfect_outside_psnr": 41.89,
+   "bias_flicker": 1.58,
+   "bias_residual": 0.199,
+   "truth_motion": 0.001
+  },
+  "lowlight_noise": {
+   "perfect_outside_psnr": 35.8,
+   "bias_flicker": 3.662,
+   "bias_residual": 0.206,
+   "truth_motion": 4.076
+  },
+  "long_track": {
+   "perfect_outside_psnr": 38.2,
+   "bias_flicker": 1.04,
+   "bias_residual": 0.207,
+   "truth_motion": 0.008
+  }
+ }
+}

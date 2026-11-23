@@ -1,0 +1,131 @@
+== 1. clips: generation and determinism ==
+PASS  static_logo: MP4 is 640x360 @ 30 fps, 90 frames, h264  [640x360 30.0 90f]
+PASS  static_logo: audio track present (aac) as declared
+PASS  moving_object: MP4 is 640x360 @ 30 fps, 90 frames, h264  [640x360 30.0 90f]
+PASS  moving_object: audio track absent as declared
+PASS  camera_pan: MP4 is 640x360 @ 30 fps, 90 frames, h264  [640x360 30.0 90f]
+PASS  camera_pan: audio track present (aac) as declared
+PASS  shot_cut: MP4 is 640x360 @ 30 fps, 90 frames, h264  [640x360 30.0 90f]
+PASS  shot_cut: audio track present (aac) as declared
+PASS  occlusion: MP4 is 640x360 @ 30 fps, 120 frames, h264  [640x360 30.0 120f]
+PASS  occlusion: audio track present (aac) as declared
+PASS  lowlight_noise: MP4 is 640x360 @ 30 fps, 90 frames, h264  [640x360 30.0 90f]
+PASS  lowlight_noise: audio track present (aac) as declared
+PASS  long_track: MP4 is 640x360 @ 30 fps, 150 frames, h264  [640x360 30.0 150f]
+PASS  long_track: audio track present (aac) as declared
+PASS  scenario set covers static overlay, moving object, camera pan, shot cut, occlusion, low-light noise, long track, with and without audio
+PASS  static_logo: rendering twice gives bit-identical input/truth/mask frames
+PASS  moving_object: rendering twice gives bit-identical input/truth/mask frames
+PASS  camera_pan: rendering twice gives bit-identical input/truth/mask frames
+PASS  shot_cut: rendering twice gives bit-identical input/truth/mask frames
+PASS  occlusion: rendering twice gives bit-identical input/truth/mask frames
+PASS  lowlight_noise: rendering twice gives bit-identical input/truth/mask frames
+PASS  long_track: rendering twice gives bit-identical input/truth/mask frames
+PASS  regenerating a clip gives identical decoded frames (encode is deterministic)
+PASS  regenerated audio is identical too
+== 2. ground truth consistency ==
+PASS  static_logo: input equals truth everywhere outside the (dilated) object mask  [0 stray px]
+PASS  static_logo: object visibly differs from the true background inside the mask (>=95% of px)  [1.000]
+PASS  static_logo: the clean truth contains no red (red == object, unambiguous)
+PASS  static_logo: the input does contain the red object
+PASS  moving_object: input equals truth everywhere outside the (dilated) object mask  [0 stray px]
+PASS  moving_object: object visibly differs from the true background inside the mask (>=95% of px)  [1.000]
+PASS  moving_object: the clean truth contains no red (red == object, unambiguous)
+PASS  moving_object: the input does contain the red object
+PASS  camera_pan: input equals truth everywhere outside the (dilated) object mask  [0 stray px]
+PASS  camera_pan: object visibly differs from the true background inside the mask (>=95% of px)  [1.000]
+PASS  camera_pan: the clean truth contains no red (red == object, unambiguous)
+PASS  camera_pan: the input does contain the red object
+PASS  shot_cut: input equals truth everywhere outside the (dilated) object mask  [0 stray px]
+PASS  shot_cut: object visibly differs from the true background inside the mask (>=95% of px)  [1.000]
+PASS  shot_cut: the clean truth contains no red (red == object, unambiguous)
+PASS  shot_cut: the input does contain the red object
+PASS  occlusion: input equals truth everywhere outside the (dilated) object mask  [0 stray px]
+PASS  occlusion: object visibly differs from the true background inside the mask (>=95% of px)  [1.000]
+PASS  occlusion: the clean truth contains no red (red == object, unambiguous)
+PASS  occlusion: the input does contain the red object
+PASS  lowlight_noise: input equals truth everywhere outside the (dilated) object mask  [0 stray px]
+PASS  lowlight_noise: object visibly differs from the true background inside the mask (>=95% of px)  [1.000]
+PASS  long_track: input equals truth everywhere outside the (dilated) object mask  [0 stray px]
+PASS  long_track: object visibly differs from the true background inside the mask (>=95% of px)  [1.000]
+PASS  long_track: the clean truth contains no red (red == object, unambiguous)
+PASS  long_track: the input does contain the red object
+PASS  static_logo: logo mask identical in every frame (fixed overlay)
+PASS  static_logo: scene really scrolls 3 px/frame (truth[t+1] == truth[t] shifted)
+PASS  camera_pan: whole frame pans (2,1) px/frame exactly (limitation case is a true global motion)
+PASS  shot_cut: truth jumps hard at frame 45 and is static elsewhere  [cut 31.8, normal 0.0]
+PASS  occlusion: object is fully hidden/out of frame in some frames, partly hidden in others, fully visible in others  [hidden 21 frames, max area 2824]
+PASS  lowlight_noise: real temporal noise (truth changes frame to frame by ~sigma) and dark scene  [10.1 / mean 37]
+PASS  long_track: 150 frames, smooth sub-pixel motion (not integer steps), speed 1-9 px/frame  [mean step 7.71]
+PASS  reveal: moving object over static background uncovers the background elsewhere (>=95%)  [1.0]
+PASS  reveal: FIXED overlay on a scrolling scene is NEVER revealed at the same screen pixel (static plate = 0)...  [0.0]
+PASS  reveal: ...but IS revealed when the scene motion is followed (motion-compensated >= 95%)  [1.0]
+PASS  reveal: camera pan with a world-fixed object is never revealed even when motion-compensated (<=20%)  [0.0]
+PASS  meta: static-plate validity flag only true for truly static scenes
+== 3. metrics validated on results with known quality ==
+PASS  perfect result (= truth): residual 0, no red left, PSNR inside 99
+PASS  do-nothing result: residual 1.0 and all red still present
+PASS  flat-grey fill: red is gone but residual error is clearly worse than perfect (metrics separate 'removed' from 'good')  [residual 0.29]
+PASS  ranking: perfect < flat fill < do nothing
+PASS  flicker metric: truth scores exactly 0
+PASS  flicker metric: a constant colour error (stable but wrong) scores ~0 flicker  [0.000]
+PASS  flicker metric: per-frame random error scores high (>=5x the constant-error case and >5 levels)  [16.99]
+PASS  ...while the same constant error still shows up in the removal metric (wrong but stable)
+PASS  outside-identity: untouched result is 100% identical outside the mask
+PASS  outside-identity: exactly 7 tampered pixels are detected, with the right max difference  [7 px, max 9]
+PASS  outside-identity: changes INSIDE the mask are not counted as outside damage
+PASS  track_error: perfect centres give 0; a (3,4) offset gives exactly 5; hidden frames are skipped
+PASS  track_error: a tracker that drifts 0.1 px/frame is measured as ~7.5 px mean over 150 frames
+== 4. audio/video parity and file-integrity tools ==
+PASS  parity: a file compared with itself passes
+PASS  parity: a trimmed copy is flagged (frames + duration)  [['frame count 90 -> 60', 'duration 3.000 -> 2.020', 'audio data changed']]
+PASS  parity: changed frame rate is flagged  [['frame count 90 -> 47', 'fps 30.0 -> 15.0', 'duration 3.000 -> 3.133']]
+PASS  parity: dropped audio track is flagged  [['audio track lost']]
+PASS  parity: re-encoded audio is flagged as changed data  [['audio data changed']]
+PASS  parity: video re-encoded but audio copied untouched PASSES (audio bit-identical, frames/fps/size equal)  [[]]
+PASS  parity: changed resolution is flagged  [['size 640x360 -> 320x180']]
+PASS  parity: a silent clip compared with itself passes (no phantom audio)
+PASS  sha256: identical copy has the same digest
+PASS  sha256: a single flipped bit changes the digest (byte-for-byte original check is sensitive)
+== 5. raw-frame gates (what Milestone 4 will use before encoding) ==
+PASS  moving_object: raw gate passes a perfect cleaner (residual 0, outside exact, flicker 0)  [{'all_frames': True, 'removed': True, 'red_gone': True, 'outside_exact': True, 'stable': True}]
+PASS  moving_object: raw gate passes a stable-but-imperfect fill (truth + bias_level) with exactly 0 flicker  [{'all_frames': True, 'removed': True, 'red_gone': True, 'outside_exact': True, 'stable': True}]
+PASS  moving_object: raw gate FAILS per-frame random fill on stability only (outside still exact)  [flicker 20.3]
+PASS  moving_object: raw gate FAILS when a single pixel outside the object differs by 1 level  [1]
+PASS  moving_object: raw gate FAILS a do-nothing result (object still there)
+PASS  moving_object: raw gate FAILS a result with missing frames
+PASS  static_logo: raw gate passes a perfect cleaner (residual 0, outside exact, flicker 0)  [{'all_frames': True, 'removed': True, 'red_gone': True, 'outside_exact': True, 'stable': True}]
+PASS  static_logo: raw gate passes a stable-but-imperfect fill (truth + bias_level) with exactly 0 flicker  [{'all_frames': True, 'removed': True, 'red_gone': True, 'outside_exact': True, 'stable': True}]
+PASS  static_logo: raw gate FAILS per-frame random fill on stability only (outside still exact)  [flicker 20.3]
+PASS  static_logo: raw gate FAILS when a single pixel outside the object differs by 1 level  [1]
+PASS  static_logo: raw gate FAILS a do-nothing result (object still there)
+PASS  static_logo: raw gate FAILS a result with missing frames
+PASS  lowlight_noise: raw gate passes a perfect cleaner (residual 0, outside exact, flicker 0)  [{'all_frames': True, 'removed': True, 'red_gone': True, 'outside_exact': True, 'stable': True}]
+PASS  lowlight_noise: raw gate passes a stable-but-imperfect fill (truth + bias_level) with exactly 0 flicker  [{'all_frames': True, 'removed': True, 'red_gone': True, 'outside_exact': True, 'stable': True}]
+PASS  lowlight_noise: raw gate FAILS per-frame random fill on stability only (outside still exact)  [flicker 20.0]
+PASS  lowlight_noise: raw gate FAILS when a single pixel outside the object differs by 1 level  [1]
+PASS  lowlight_noise: raw gate FAILS a do-nothing result (object still there)
+PASS  lowlight_noise: raw gate FAILS a result with missing frames
+== 6. end-to-end evaluate() on MP4 output (codec in the loop, per-scenario calibrated limits) ==
+PASS  calibration.json exists, covers every scenario and records the ffmpeg build it was measured with  [ffmpeg version 6.1.1-3ubuntu5 Copyright ]
+PASS  moving_object: a perfect cleaner (truth, app-style encode, audio copied) passes every post-encode gate  [{"outside_psnr": 38.03, "limit_psnr": 35.03, "flicker": 0.0, "limit_flicker": 2.36, "residual": 0.04}]
+PASS  moving_object: calibration.json still matches this machine's ffmpeg (outside PSNR within 0.2 dB)  [38.03 vs 38.03]
+PASS  moving_object: a stable-but-imperfect fill passes (and its flicker matches the calibrated figure within 0.3)  [0.93 vs 0.929]
+PASS  moving_object: a fill that re-randomises every frame FAILS the stability gate even through the codec  [flicker 6.14 > limit 2.36]
+PASS  moving_object: a cleaner that blacks out pixels OUTSIDE the object FAILS the outside-damage gate  [outside PSNR 21.7 < 35.0]
+PASS  moving_object: an unchanged clip FAILS the removal gate (cannot be fooled)  [residual 0.99]
+PASS  static_logo: a perfect cleaner (truth, app-style encode, audio copied) passes every post-encode gate  [{"outside_psnr": 37.36, "limit_psnr": 34.36, "flicker": 0.0, "limit_flicker": 6.12, "residual": 0.04}]
+PASS  static_logo: calibration.json still matches this machine's ffmpeg (outside PSNR within 0.2 dB)  [37.36 vs 37.36]
+PASS  static_logo: a stable-but-imperfect fill passes (and its flicker matches the calibrated figure within 0.3)  [2.81 vs 2.81]
+PASS  static_logo: a fill that re-randomises every frame FAILS the stability gate even through the codec  [flicker 10.13 > limit 6.12]
+PASS  static_logo: a cleaner that blacks out pixels OUTSIDE the object FAILS the outside-damage gate  [outside PSNR 21.6 < 34.4]
+PASS  static_logo: an unchanged clip FAILS the removal gate (cannot be fooled)  [residual 0.97]
+PASS  lowlight_noise: a perfect cleaner (truth, app-style encode, audio copied) passes every post-encode gate  [{"outside_psnr": 35.8, "limit_psnr": 32.8, "flicker": 0.0, "limit_flicker": 7.82, "residual": 0.18}]
+PASS  lowlight_noise: calibration.json still matches this machine's ffmpeg (outside PSNR within 0.2 dB)  [35.80 vs 35.8]
+PASS  lowlight_noise: a stable-but-imperfect fill passes (and its flicker matches the calibrated figure within 0.3)  [3.66 vs 3.662]
+PASS  lowlight_noise: a fill that re-randomises every frame FAILS the stability gate even through the codec  [flicker 13.01 > limit 7.82]
+PASS  lowlight_noise: a cleaner that blacks out pixels OUTSIDE the object FAILS the outside-damage gate  [outside PSNR 31.3 < 32.8]
+PASS  lowlight_noise: an unchanged clip FAILS the removal gate (cannot be fooled)  [residual 1.00]
+PASS  post-encode gate FAILS a cleaner that drops the audio track
+
+123/123 passed  (226s)
