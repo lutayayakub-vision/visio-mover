@@ -1,0 +1,102 @@
+[
+ {
+  "scenario": "long_track",
+  "frames": 150,
+  "trackMs": 1452,
+  "cameraCheckMs": 2397,
+  "totalMs": 4002,
+  "msPerFrame": 9.68,
+  "matches": 447,
+  "peakRssMB": 281,
+  "baseRssMB": 190
+ },
+ {
+  "scenario": "moving_object",
+  "frames": 90,
+  "trackMs": 968,
+  "cameraCheckMs": 1439,
+  "totalMs": 2477,
+  "msPerFrame": 10.76,
+  "matches": 267,
+  "peakRssMB": 211,
+  "baseRssMB": 138
+ },
+ {
+  "scenario": "shot_cut",
+  "frames": 90,
+  "trackMs": 998,
+  "cameraCheckMs": 1311,
+  "totalMs": 2383,
+  "msPerFrame": 11.09,
+  "matches": 267,
+  "peakRssMB": 216,
+  "baseRssMB": 138
+ },
+ {
+  "scenario": "lowlight_noise",
+  "frames": 90,
+  "trackMs": 837,
+  "cameraCheckMs": 1535,
+  "totalMs": 2445,
+  "msPerFrame": 9.3,
+  "matches": 267,
+  "peakRssMB": 201,
+  "baseRssMB": 137
+ },
+ {
+  "scenario": "camera_pan",
+  "frames": 90,
+  "trackMs": 730,
+  "cameraCheckMs": 1370,
+  "totalMs": 2170,
+  "msPerFrame": 8.11,
+  "matches": 267,
+  "peakRssMB": 209,
+  "baseRssMB": 138
+ },
+ {
+  "scenario": "static_logo",
+  "frames": 90,
+  "trackMs": 1390,
+  "cameraCheckMs": 1286,
+  "totalMs": 2749,
+  "msPerFrame": 15.45,
+  "matches": 267,
+  "peakRssMB": 213,
+  "baseRssMB": 138
+ },
+ {
+  "scenario": "occlusion (hard)",
+  "frames": 120,
+  "trackMs": 793,
+  "cameraCheckMs": 1964,
+  "totalMs": 2847,
+  "msPerFrame": 6.61,
+  "matches": 201,
+  "peakRssMB": 242,
+  "baseRssMB": 164
+ },
+ {
+  "scenario": "occlusion + 7 correction rounds",
+  "frames": 120,
+  "totalMs": 21813,
+  "peakRssMB": 286,
+  "baseRssMB": 164
+ },
+ {
+  "scenario": "track + clean (moving_object)",
+  "frames": 90,
+  "totalMs": 16396,
+  "peakRssMB": 349
+ },
+ {
+  "scenario": "interpolation only, figure-8, keyframe every 10",
+  "frames": 150,
+  "maxInterpolationErrorPx": 8.41
+ },
+ {
+  "scenario": "interpolation only, figure-8, keyframe every 20",
+  "frames": 150,
+  "maxInterpolationErrorPx": 32.28
+ }
+]

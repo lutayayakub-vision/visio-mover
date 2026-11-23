@@ -1,0 +1,110 @@
+PASS  A/long_track: every frame tracked, none flagged (150-frame figure-8 with sub-pixel motion (drift test))  — {"keyframe":1,"tracked":149,"interpolated":0,"reentry":0,"uncertain":0,"lost":0,"absent":0}
+PASS  A/long_track: position error mean 0.082 / p95 0.112 / max 0.126 px (max ≤ 0.35)
+PASS  A/long_track: mask overlaps the true object (IoU mean 0.986, min 0.981; ≥ 0.95 / 0.9)
+PASS  A/long_track: no silent errors (a 'tracked' frame more than 4 px off or while hidden)
+PASS  A/long_track: no false camera-movement alarm  — checked 14 sample pairs
+PASS  A/moving_object: every frame tracked, none flagged (object crossing a static scene)  — {"keyframe":1,"tracked":89,"interpolated":0,"reentry":0,"uncertain":0,"lost":0,"absent":0}
+PASS  A/moving_object: position error mean 0.098 / p95 0.142 / max 0.158 px (max ≤ 0.35)
+PASS  A/moving_object: mask overlaps the true object (IoU mean 0.987, min 0.982; ≥ 0.95 / 0.9)
+PASS  A/moving_object: no silent errors (a 'tracked' frame more than 4 px off or while hidden)
+PASS  A/moving_object: no false camera-movement alarm  — checked 8 sample pairs
+PASS  A/shot_cut: every frame tracked, none flagged (background cut in the middle (object keeps moving))  — {"keyframe":1,"tracked":89,"interpolated":0,"reentry":0,"uncertain":0,"lost":0,"absent":0}
+PASS  A/shot_cut: position error mean 0.090 / p95 0.139 / max 0.139 px (max ≤ 0.35)
+PASS  A/shot_cut: mask overlaps the true object (IoU mean 0.991, min 0.981; ≥ 0.95 / 0.9)
+PASS  A/shot_cut: no silent errors (a 'tracked' frame more than 4 px off or while hidden)
+PASS  A/shot_cut: no false camera-movement alarm  — checked 8 sample pairs
+PASS  A/lowlight_noise: every frame tracked, none flagged (low light, sensor noise σ=9)  — {"keyframe":1,"tracked":89,"interpolated":0,"reentry":0,"uncertain":0,"lost":0,"absent":0}
+PASS  A/lowlight_noise: position error mean 0.068 / p95 0.143 / max 0.152 px (max ≤ 0.35)
+PASS  A/lowlight_noise: mask overlaps the true object (IoU mean 0.988, min 0.981; ≥ 0.95 / 0.9)
+PASS  A/lowlight_noise: no silent errors (a 'tracked' frame more than 4 px off or while hidden)
+PASS  A/lowlight_noise: no false camera-movement alarm  — checked 8 sample pairs
+PASS  A/camera_pan: every frame tracked, none flagged (camera pans; object fixed in the world)  — {"keyframe":1,"tracked":89,"interpolated":0,"reentry":0,"uncertain":0,"lost":0,"absent":0}
+PASS  A/camera_pan: position error mean 0.000 / p95 0.000 / max 0.000 px (max ≤ 0.35)
+PASS  A/camera_pan: mask overlaps the true object (IoU mean 1.000, min 1.000; ≥ 0.95 / 0.9)
+PASS  A/camera_pan: no silent errors (a 'tracked' frame more than 4 px off or while hidden)
+PASS  A/camera_pan: camera/scene movement is reported  — checked 8 sample pairs
+PASS  A/static_logo: every frame tracked, none flagged (scrolling scene, fixed overlay)  — {"keyframe":1,"tracked":89,"interpolated":0,"reentry":0,"uncertain":0,"lost":0,"absent":0}
+PASS  A/static_logo: position error mean 0.000 / p95 0.000 / max 0.000 px (max ≤ 0.35)
+PASS  A/static_logo: mask overlaps the true object (IoU mean 1.000, min 1.000; ≥ 0.95 / 0.9)
+PASS  A/static_logo: no silent errors (a 'tracked' frame more than 4 px off or while hidden)
+PASS  A/static_logo: camera/scene movement is reported  — checked 8 sample pairs
+PASS  A/drift over 150 frames: mean error by thirds 0.082 / 0.082 / 0.083 px — no growth (last − first ≤ 0.1, all ≤ 0.2)
+PASS  A/occlusion: never 'tracked' through a hidden object or a wrong place (0 silent errors)
+PASS  A/occlusion: flagged instead — uncertain 14, lost 48, re-entry 1
+PASS  A/occlusion: accuracy on the frames it does track is still sub-pixel  — max 0.082 px over 52 frames
+PASS  A/occlusion: warns about uncertain/lost frames and re-entry
+PASS  A/occlusion: re-entry detected as a candidate after the object returns (frame ≥ 88), never resumed silently  — first candidate frame 93; lost 48
+PASS  A/occlusion with autoResume: resumes at the re-entry, that frame is flagged for review, accuracy stays sub-pixel (max 0.093)
+PASS  A/manual correction: 63 frames needed attention → 0 after 7 rounds (13 keyframes: 0,26,35,63,64,65,66,67,88,89,93,117,119)
+PASS  A/manual correction: every frame resolved (tracked 82, interpolated 5, absent 22, keyframes 11)
+PASS  A/manual correction: tracked/interpolated frames stay on the object (max error 0.114 px, 0 silent, IoU 0.980)
+PASS  A/manual correction: object exit is represented as 'absent', not as a mask
+PASS  A/integration: one drawn mask → track → resolve → temporal cleanup succeeds  — track 898 ms, total 16396 ms, peak 349 MB
+PASS  A/integration: object gone (residual 0.000), red left 0
+PASS  A/integration: pixels outside the selection identical (0 differ)
+PASS  B/sub-pixel v=(0.37,0.21) px/frame: rms 0.143, max 0.212 px (max ≤ 0.35), all 59 frames tracked
+PASS  B/sub-pixel v=(0.5,0.5) px/frame: rms 0.082, max 0.115 px (max ≤ 0.35), all 59 frames tracked
+PASS  B/sub-pixel v=(1.5,-0.7) px/frame: rms 0.118, max 0.172 px (max ≤ 0.35), all 59 frames tracked
+PASS  B/sub-pixel v=(0.05,0.03) px/frame: rms 0.137, max 0.220 px (max ≤ 0.35), all 59 frames tracked
+PASS  B/sub-pixel v=(3.3,1.9) px/frame: rms 0.143, max 0.209 px (max ≤ 0.35), all 59 frames tracked
+PASS  B/mask alignment: IoU 0.977 (≥ 0.95), centroid offset to true outline ≤ 0.591 px (≤ 0.6)
+PASS  B/noise σ=5: rms 0.123, max 0.214 px (≤ 0.5), 59/59 tracked, no silent errors
+PASS  B/noise σ=10: rms 0.124, max 0.218 px (≤ 0.5), 59/59 tracked, no silent errors
+PASS  B/noise σ=20: rms 0.126, max 0.226 px (≤ 0.5), 59/59 tracked, no silent errors
+PASS  B/noise σ=30: rms 0.128, max 0.236 px (≤ 0.5), 59/59 tracked, no silent errors
+PASS  B/extreme noise σ=90: no silent errors (tracked 8, flagged 31)
+PASS  B/lighting fades to 50% over 100 frames: still tracked (99/99), max 0.172 px
+PASS  B/object grows 1.0→1.8× over 150 frames: flagged from frame 16 instead of drifting (0 silent errors, 134 frames need review)
+PASS  B/…resolveMasks refuses (unresolved_tracking) and lists the frames; nothing is cleaned  — Tracking is not finished: 134 frames need your attention (first: frame 16, low match). Mark the object on thos
+PASS  B/manual keyframes every 25 frames: all 150 frames resolved (tracked 143, interpolated 0, keyframes 7), max error 0.584 px (≤ 1.0)
+PASS  B/wide occluder: no frame is 'tracked' while less than half of the object is visible (flagged 58, silent 0)
+PASS  B/wide occluder: warns and refuses to produce masks
+PASS  B/recovery after manual correction: all frames resolved; interpolated across the bar (30 frames, max 0.000 px ≤ 0.5), tracking after the keyframe max 0.016 px ≤ 0.35
+PASS  B/…interpolated frame (hidden object) carries a full-size mask at the right place for the cleanup  — truth visible pixels 0
+PASS  B/object leaves the frame: flagged from frame 20 (object half out ≈ 20), never tracked once mostly outside, 0 silent
+PASS  B/object leaves: it is 'lost' (no mask), not coasted indefinitely
+PASS  B/re-entry detected at frame 73 (object fully back at ≈ 76); reported as a candidate, not resumed
+PASS  B/autoResume: re-entry frame 73 flagged for review, then tracked accurately (36 frames, max 0.041 px)
+PASS  B/identical object crosses the path: tracker either stays on the right one or flags (0 silent errors; tracked 109, flagged 0, max error of tracked 0.001 px)
+PASS  B/interpolation: midpoint lies exactly halfway between the keyframes  — (73.00,124.00)
+PASS  B/interpolation: reported as a warning with the frame list
+PASS  B/interpolation over a gap longer than 30 frames is NOT accepted (uncertain, needs review)
+PASS  B/keyframe frames carry exactly the mask the user drew (byte-identical)
+PASS  B/interpolation-only on a curved figure-8 path, keyframes every 10 frames: max error 8.4 px (reported limitation; sanity ≤ 12)
+PASS  B/interpolation-only on a curved figure-8 path, keyframes every 20 frames: max error 32.3 px (reported limitation; sanity ≤ 40)
+PASS  B/'object not visible' on both sides marks the frames between as absent (resolved, no mask)
+PASS  B/absent on one side and the object on the other: the stretch is NOT decided for the user
+PASS  B/a single-colour object cannot be followed automatically: warned, nothing tracked
+PASS  B/bad input: no keyframes → bad_input
+PASS  B/bad input: only 'absent' keyframes → bad_input
+PASS  B/bad input: keyframe outside the clip → bad_input
+PASS  B/bad input: two keyframes on one frame → bad_input
+PASS  B/bad input: empty selection → bad_input with a clear message
+PASS  B/bad input: selection too small to track → bad_input
+PASS  B/bad input: wrong mask or frame size → bad_input
+PASS  B/bad input: no frames → bad_input
+PASS  B/deterministic: two runs give identical positions and statuses
+PASS  B/inputs (frames, masks) are never modified
+PASS  B/cancel: stops promptly with code 'cancelled'  — checks=6
+PASS  B/progress is monotonic and ends at 1
+PASS  B/resolveMasks on a fully tracked clip returns one mask per frame, equal to maskAt
+PASS  B/shiftMask: whole-pixel shifts are exact
+PASS  B/failed tracking cannot reach the cleanup: resolveMasks throws before reconstructVideo is called
+PASS  B/…the pipeline did not produce a 'successful' cleanup from failed tracking
+
+BENCH (scenario runs are separate processes; ms = tracker only unless noted; RSS = process peak, baseline = before tracking):
+┌─────────┬───────────────────────────────────┬────────┬──────────┬─────────────────┬──────────┬──────────┬─────────┬─────────────┬─────────────┐
+│ (index) │ scenario                          │ frames │ track ms │ camera-check ms │ total ms │ ms/frame │ matches │ peak RSS MB │ baseline MB │
+├─────────┼───────────────────────────────────┼────────┼──────────┼─────────────────┼──────────┼──────────┼─────────┼─────────────┼─────────────┤
+│ 0       │ 'long_track'                      │ 150    │ 1452     │ 2397            │ 4002     │ 9.68     │ 447     │ 281         │ 190         │
+│ 1       │ 'moving_object'                   │ 90     │ 968      │ 1439            │ 2477     │ 10.76    │ 267     │ 211         │ 138         │
+│ 2       │ 'shot_cut'                        │ 90     │ 998      │ 1311            │ 2383     │ 11.09    │ 267     │ 216         │ 138         │
+│ 3       │ 'lowlight_noise'                  │ 90     │ 837      │ 1535            │ 2445     │ 9.3      │ 267     │ 201         │ 137         │
+│ 4       │ 'camera_pan'                      │ 90     │ 730      │ 1370            │ 2170     │ 8.11     │ 267     │ 209         │ 138         │
+│ 5       │ 'static_logo'                     │ 90     │ 1390     │ 1286            │ 2749     │ 15.45    │ 267     │ 213         │ 138         │
+│ 6       │ 'occlusion (hard)'                │ 120    │ 793      │ 1964            │ 2847     │ 6.61     │ 201     │ 242         │ 164         │
+│ 7       │ 'occlusion + 7 correction rounds' │ 120    │ ''       │ ''              │ 21813    │ ''       │ ''      │ 286         │ 164         │
+│ 8       │ 'track + clean (moving_object)'   │ 90     │ ''       │ ''              │ 16396    │ ''       │ ''      │ 349         │ ''          │
+└─────────┴───────────────────────────────────┴────────┴──────────┴─────────────────┴──────────┴──────────┴─────────┴─────────────┴─────────────┘
+
+93/93 passed

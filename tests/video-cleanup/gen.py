@@ -79,7 +79,12 @@ def export_raw(name, out):
     np.ascontiguousarray(inp).tofile(os.path.join(d, "input.rgb"))
     np.ascontiguousarray(mask.astype(np.uint8)).tofile(os.path.join(d, "mask.u8"))
     with open(os.path.join(d, "info.json"), "w") as f:
-        json.dump({"name": name, "w": S.W, "h": S.H, "frames": len(inp)}, f)
+        sc = S.get(name)
+        cs = []
+        for t in range(len(inp)):
+            c = sc.centre(t)
+            cs.append([float(c[0]), float(c[1])] if c else None)
+        json.dump({"name": name, "w": S.W, "h": S.H, "frames": len(inp), "centre": cs, "bg_velocity": list(sc.bg_velocity), "camera_motion": sc.camera_motion}, f)
     return d
 
 
