@@ -7,3 +7,5 @@ dist
 # test artefacts
 tests/fixtures/
 tests/out/
+__pycache__/
+*.pyc
