@@ -1,0 +1,133 @@
+PASS moving_object: pipeline succeeds, status ok, 90 frames in 19.7 s
+PASS moving_object: pixels outside the selection identical BEFORE encoding (0 differ over 90 frames), selection actually changed (467418 px)
+PASS moving_object: frame count, fps, size unchanged (90 frames, 30/1, 640x360)
+PASS moving_object: duration unchanged (3.000 vs 3.000 s)
+PASS moving_object: audio absent as in the source
+PASS moving_object: object removed (residual 0.045 ≤ 0.35, red left 0)
+PASS moving_object: outside the selection still matches a codec-matched original (PSNR 39.4 ≥ 35.0 dB)
+PASS moving_object: no flicker beyond codec noise (excess 0.069 ≤ 2.358)
+PASS moving_object: A/V parity incl. no audio
+PASS moving_object: original file unchanged (SHA-256 in the browser before/after, and on disk)
+PASS moving_object: all workers gone after the run (pool alive 0, spawned 1)
+PASS long_track: pipeline succeeds, status ok, 150 frames in 37.1 s
+PASS long_track: pixels outside the selection identical BEFORE encoding (0 differ over 150 frames), selection actually changed (703595 px)
+PASS long_track: frame count, fps, size unchanged (150 frames, 30/1, 640x360)
+PASS long_track: duration unchanged (5.000 vs 5.000 s)
+PASS long_track: audio stream preserved (AAC copied untouched)
+PASS long_track: object removed (residual 0.046 ≤ 0.35, red left 0)
+PASS long_track: outside the selection still matches a codec-matched original (PSNR 38.9 ≥ 35.2 dB)
+PASS long_track: no flicker beyond codec noise (excess 0.084 ≤ 2.580)
+PASS long_track: A/V parity incl. audio data bit-identical
+PASS long_track: original file unchanged (SHA-256 in the browser before/after, and on disk)
+PASS long_track: all workers gone after the run (pool alive 0, spawned 1)
+PASS static_logo: pipeline succeeds, status ok, 90 frames in 8.6 s
+PASS static_logo: pixels outside the selection identical BEFORE encoding (0 differ over 90 frames), selection actually changed (757369 px)
+PASS static_logo: frame count, fps, size unchanged (90 frames, 30/1, 640x360)
+PASS static_logo: duration unchanged (3.000 vs 3.000 s)
+PASS static_logo: audio stream preserved (AAC copied untouched)
+PASS static_logo: object removed (residual 0.044 ≤ 0.35, red left 0)
+PASS static_logo: outside the selection still matches a codec-matched original (PSNR 38.0 ≥ 34.4 dB)
+PASS static_logo: no flicker beyond codec noise (excess 1.901 ≤ 6.120)
+PASS static_logo: A/V parity incl. audio data bit-identical
+PASS static_logo: original file unchanged (SHA-256 in the browser before/after, and on disk)
+PASS static_logo: all workers gone after the run (pool alive 0, spawned 1)
+PASS static_logo: scene motion reported, still status ok
+PASS shot_cut: pipeline succeeds, status ok, 90 frames in 16.0 s
+PASS shot_cut: pixels outside the selection identical BEFORE encoding (0 differ over 90 frames), selection actually changed (467958 px)
+PASS shot_cut: frame count, fps, size unchanged (90 frames, 30/1, 640x360)
+PASS shot_cut: duration unchanged (3.000 vs 3.000 s)
+PASS shot_cut: audio stream preserved (AAC copied untouched)
+PASS shot_cut: object removed (residual 0.038 ≤ 0.35, red left 0)
+PASS shot_cut: outside the selection still matches a codec-matched original (PSNR 42.7 ≥ 36.3 dB)
+PASS shot_cut: no flicker beyond codec noise (excess 0.116 ≤ 2.646)
+PASS shot_cut: A/V parity incl. audio data bit-identical
+PASS shot_cut: original file unchanged (SHA-256 in the browser before/after, and on disk)
+PASS shot_cut: all workers gone after the run (pool alive 0, spawned 1)
+PASS shot_cut: cut reported
+PASS lowlight_noise: pipeline succeeds, status ok, 90 frames in 23.5 s
+PASS lowlight_noise: pixels outside the selection identical BEFORE encoding (0 differ over 90 frames), selection actually changed (472307 px)
+PASS lowlight_noise: frame count, fps, size unchanged (90 frames, 30/1, 640x360)
+PASS lowlight_noise: duration unchanged (3.000 vs 3.000 s)
+PASS lowlight_noise: audio stream preserved (AAC copied untouched)
+PASS lowlight_noise: object removed (residual 0.189 ≤ 0.35, red left null)
+PASS lowlight_noise: outside the selection still matches a codec-matched original (PSNR 39.0 ≥ 32.8 dB)
+PASS lowlight_noise: no flicker beyond codec noise (excess 4.122 ≤ 7.824)
+PASS lowlight_noise: A/V parity incl. audio data bit-identical
+PASS lowlight_noise: original file unchanged (SHA-256 in the browser before/after, and on disk)
+PASS lowlight_noise: all workers gone after the run (pool alive 0, spawned 1)
+PASS camera_pan: refused with insufficient_background (no output produced)  [Can't reconstruct reliably: The object seems to move together with the scene (for example a camera p]
+PASS camera_pan: message says nothing was changed and names the camera pan
+PASS camera_pan: workers all gone after the refusal
+PASS camera_pan with explicit opt-in: result is 'degraded' with spatial_fallback + object_moves_with_background warnings, never 'ok'
+PASS camera_pan opt-in: pixels outside the selection still identical before encoding
+PASS camera_pan opt-in: edit metadata records status 'degraded' and a moving camera
+PASS occlusion with one keyframe: refused (tracking_unresolved), frames listed, 'Nothing was cleaned up'  [Tracking is not finished: 64 frames need your attention (first: frame 27, occluded). Mark the object on those frames, or]
+PASS occlusion unresolved: no output, workers gone, original unchanged
+PASS occlusion with 3 keyframes (range 0–60): succeeds (status ok), 60 frames @ 30/1, audio kept
+PASS occlusion range: object removed (residual 0.035), outside ok (43.8 dB), stable (0.554)
+PASS occlusion range: pixels outside the selection identical before encoding (0)
+PASS occlusion range: metadata records the keyframes and the sub-range
+PASS BT.709-tagged source: object removed with correct colours (residual 0.050 ≤ 0.35, inside PSNR 32.7 dB ≥ 28)
+PASS BT.709-tagged source: output keeps the BT.709 tag  [bt709]
+PASS limit: 12 s clip refused on desktop (too_long, 10 s)  [The selected part is 12.0 seconds. In the browser object removal supports up to 10 seconds at a time. Trim it first.]
+PASS limit: exactly 10 s (300 frames) of the long clip is accepted by the pre-flight (fails later only on the bogus mask)  [tracking_unresolved]
+PASS limit: 301 frames refused (too_long)
+PASS limit: frame-count cap refused (too_many_frames) with the numbers  [The selected part has 120 frames; the limit is 100. Trim it first.]
+PASS limit: 60 fps refused (fps_too_high) with advice to convert  [This video runs at 60 frames per second. Object removal supports up to 30. Convert it to 30 fps or lower first.]
+PASS limit: 2560×1440 refused (resolution_too_high) naming the sizes  [This video is 2560×1440. In the browser object removal supports up to 1920×1080. Lower the resolution first.]
+PASS limit: full-HD working area refused (region_too_large, 2 MP)  [The working area is 2.07 megapixels; the limit is 2.0. Make it smaller (just around where the object moves).]
+PASS limit: 1.4 MP area over 90 frames refused by the memory budget (region_too_large, smaller area advised)  [For 90 frames the working area can be at most 0.93 megapixels on this device (it is 1.44). Make it smaller or trim the clip.]
+PASS limit: 9 manual keyframes refused (too_many_keyframes)  [9 manual keyframes were given; the limit is 8. Use fewer, or split the clip.]
+PASS limit: 51 MB file refused (file_too_large, 50 MB)  [This video is 51.0 MB. In the browser the limit for editing is 50 MB.]
+PASS limit: mobile profile refuses 6 s (too_long, 5 s)  [The selected part is 6.0 seconds. On this device object removal supports up to 5 seconds at a time. Trim it first.]
+PASS limit: mobile profile refuses 1080p (resolution_too_high, 1280×720)  [This video is 1920×1080. On this device object removal supports up to 1280×720. Lower the resolution first.]
+PASS limit: projected time over the cap refused before any work (would_be_too_slow), no worker ever created  [This would take about 0 minutes on this device (the limit is 0.001). Use a shorter clip or a smaller working area.]
+PASS input: selection outside the working area refused (region_invalid) with a count  [900 selected pixels on frame 0 are outside the working area. Enlarge the working area so it includes the whole object.]
+PASS input: tiny working area refused (region_invalid)
+PASS input: no keyframe refused (bad_input)
+PASS input: reversed range refused (bad_input)
+PASS format: 4:4:4 video refused (unsupported) with an explanation  [This video uses yuv444p. Object removal supports standard 8-bit 4:2:0 video (typical MP4/H.264 from phones and cameras).]
+PASS corrupt: truncated file refused (corrupt), nothing produced, workers gone  [unsupported: This video's pixel format couldn't be read.]
+PASS corrupt: a text file named .mp4 refused with a clear message (corrupt/unsupported)  [unsupported: This video's pixel format couldn't be read.]
+PASS simulated out-of-memory in 'extract': clear memory error, no output, workers gone, original unchanged  [memory: This device ran out of memory. Try a shorter clip or a smaller working area, and close oth]
+PASS after the 'extract' fault the SAME engine runs a new job successfully (45 frames, outside identical)
+PASS simulated out-of-memory in 'clean': clear memory error, no output, workers gone, original unchanged  [memory: This device ran out of memory. Try a shorter clip or a smaller working area, and close oth]
+PASS after the 'clean' fault the SAME engine runs a new job successfully (45 frames, outside identical)
+PASS simulated failure in 'encode': clear failed error, no output, workers gone, original unchanged  [failed: Object removal failed unexpectedly. Nothing was changed.]
+PASS after the 'encode' fault the SAME engine runs a new job successfully (45 frames, outside identical)
+PASS simulated out-of-memory in 'track': clear memory error, no output, workers gone, original unchanged  [memory: This device ran out of memory. Try a shorter clip or a smaller working area, and close oth]
+PASS after the 'track' fault the SAME engine runs a new job successfully (45 frames, outside identical)
+PASS simulated failure in 'join': clear failed error, no output, workers gone, original unchanged  [failed: Object removal failed unexpectedly. Nothing was changed.]
+PASS after the 'join' fault the SAME engine runs a new job successfully (45 frames, outside identical)
+PASS cancel during 'extract': rejected as 'cancelled' within 2 s of the request (201 ms)
+PASS cancel during 'extract': every worker terminated (pool 0, browser workers 0 vs 0 before), ffmpeg engine torn down
+PASS cancel during 'extract': no output, original file unchanged (SHA-256)
+PASS after the cancel during 'extract' a new run succeeds on the same engine
+PASS cancel during 'track': rejected as 'cancelled' within 2 s of the request (107 ms)
+PASS cancel during 'track': every worker terminated (pool 0, browser workers 0 vs 0 before), ffmpeg engine torn down
+PASS cancel during 'track': no output, original file unchanged (SHA-256)
+PASS after the cancel during 'track' a new run succeeds on the same engine
+PASS cancel during 'clean': rejected as 'cancelled' within 2 s of the request (151 ms)
+PASS cancel during 'clean': every worker terminated (pool 0, browser workers 0 vs 0 before), ffmpeg engine torn down
+PASS cancel during 'clean': no output, original file unchanged (SHA-256)
+PASS after the cancel during 'clean' a new run succeeds on the same engine
+PASS a run far slower than projected is stopped (too_slow) with a plain explanation, nothing produced  [too_slow: This is taking much longer than expected (about 0 minutes in total). It was stop]
+PASS all original fixtures byte-identical on disk after the whole suite
+
+BENCH (real Chrome + ffmpeg.wasm, this sandbox)
+┌─────────┬───────────────────────────────────────┬────────┬──────────┬───────┬─────────┬───────┬───────┬──────┬─────────┬────────────────────┬─────────┬───────────┐
+│ (index) │ scenario                              │ frames │ total ms │ est   │ extract │ track │ clean │ join │ heap MB │ chrome RSS peak MB │ base MB │ cancel ms │
+├─────────┼───────────────────────────────────────┼────────┼──────────┼───────┼─────────┼───────┼───────┼──────┼─────────┼────────────────────┼─────────┼───────────┤
+│ 0       │ 'moving_object'                       │ 90     │ 19734    │ 24819 │ 719     │ 2510  │ 16424 │ 31   │ 111     │ 1349               │ 920     │ ''        │
+│ 1       │ 'long_track'                          │ 150    │ 37102    │ 40898 │ 771     │ 4456  │ 31777 │ 50   │ 170     │ 1463               │ 1087    │ ''        │
+│ 2       │ 'static_logo'                         │ 90     │ 8573     │ 11482 │ 282     │ 1495  │ 6719  │ 33   │ 72      │ 1245               │ 1133    │ ''        │
+│ 3       │ 'shot_cut'                            │ 90     │ 16045    │ 21732 │ 426     │ 2202  │ 13303 │ 30   │ 98      │ 1366               │ 1037    │ ''        │
+│ 4       │ 'lowlight_noise'                      │ 90     │ 23498    │ 21808 │ 1492    │ 2480  │ 19330 │ 61   │ 95      │ 1398               │ 1073    │ ''        │
+│ 5       │ 'camera_pan (opt-in, degraded)'       │ 90     │ 38033    │ ''    │ 483     │ 1436  │ 36005 │ 42   │ 122     │ 1409               │ 1118    │ ''        │
+│ 6       │ 'occlusion (range 0-60, 3 keyframes)' │ 60     │ 7113     │ ''    │ 304     │ 1292  │ 5386  │ 80   │ 97      │ 1522               │ 1199    │ ''        │
+│ 7       │ 'cancel during extract'               │ ''     │ ''       │ ''    │ ''      │ ''    │ ''    │ ''   │ ''      │ ''                 │ ''      │ 201       │
+│ 8       │ 'cancel during track'                 │ ''     │ ''       │ ''    │ ''      │ ''    │ ''    │ ''   │ ''      │ ''                 │ ''      │ 107       │
+│ 9       │ 'cancel during clean'                 │ ''     │ ''       │ ''    │ ''      │ ''    │ ''    │ ''   │ ''      │ ''                 │ ''      │ 151       │
+└─────────┴───────────────────────────────────────┴────────┴──────────┴───────┴─────────┴───────┴───────┴──────┴─────────┴────────────────────┴─────────┴───────────┘
+
+115/115 passed

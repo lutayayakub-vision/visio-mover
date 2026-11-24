@@ -36,6 +36,7 @@ export type TemporalOptions = {
   /** "error" (default): refuse. "spatial": fill the rest with Stage 1 PatchMatch and mark the result degraded. */ onInsufficient?: "error" | "spatial";
   /** seed the spatial fallback from the previous frame's result (default true) */ seedFromPrevious?: boolean;
   /** treat the clip as one shot (testing / explicit user choice) */ detectCuts?: boolean;
+  /** reconstruct only these frames (inclusive); the others serve as observations only and are returned untouched (used for chunked processing) */ range?: [number, number];
   seed?: number; verify?: boolean;
   onProgress?: (fraction: number, label: string) => void; shouldCancel?: () => boolean;
 };
@@ -243,6 +244,7 @@ export function reconstructVideo(frames: Frame[], masks: Uint8Array[], w: number
   const vals = new Uint8Array(o.maxObs), tmpv = new Uint8Array(o.maxObs);
   for (let t = 0; t < N; t++) {
     cancelled(); progress(0.15 + 0.5 * t / N, "Collecting background from other frames");
+    if (o.range && (t < o.range[0] || t > o.range[1])) continue;
     const idxList: number[] = []; for (let i = 0; i < npix; i++) if (masks[t][i]) idxList.push(i);
     if (!idxList.length) continue;
     const idx = Int32Array.from(idxList), m = idx.length; maskedTotal += m;

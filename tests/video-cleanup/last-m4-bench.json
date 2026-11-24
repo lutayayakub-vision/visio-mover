@@ -1,0 +1,196 @@
+[
+ {
+  "scenario": "moving_object",
+  "frames": 90,
+  "region": {
+   "x": 5,
+   "y": 45,
+   "w": 630,
+   "h": 270
+  },
+  "chunks": 2,
+  "chunkFrames": 60,
+  "workers": 1,
+  "estimateMs": 35188,
+  "totalMs": 18756,
+  "ms": {
+   "prepare": 56,
+   "extract": 567,
+   "track": 2200,
+   "clean": 15887,
+   "join": 24,
+   "total": 18733
+  },
+  "jsHeapPeakMB": 111,
+  "chromeRssPeakMB": 1385,
+  "chromeRssBaseMB": 928,
+  "outBytes": 32770,
+  "warnings": []
+ },
+ {
+  "scenario": "long_track",
+  "frames": 150,
+  "region": {
+   "x": 47,
+   "y": 17,
+   "w": 546,
+   "h": 326
+  },
+  "chunks": 3,
+  "chunkFrames": 60,
+  "workers": 1,
+  "estimateMs": 58921,
+  "totalMs": 34218,
+  "ms": {
+   "prepare": 44,
+   "extract": 792,
+   "track": 3843,
+   "clean": 29485,
+   "join": 38,
+   "total": 34203
+  },
+  "jsHeapPeakMB": 170,
+  "chromeRssPeakMB": 1471,
+  "chromeRssBaseMB": 1097,
+  "outBytes": 115257,
+  "warnings": []
+ },
+ {
+  "scenario": "static_logo",
+  "frames": 90,
+  "region": {
+   "x": 417,
+   "y": 0,
+   "w": 206,
+   "h": 127
+  },
+  "chunks": 2,
+  "chunkFrames": 60,
+  "workers": 1,
+  "estimateMs": 13614,
+  "totalMs": 8506,
+  "ms": {
+   "prepare": 47,
+   "extract": 250,
+   "track": 1697,
+   "clean": 6436,
+   "join": 38,
+   "total": 8469
+  },
+  "jsHeapPeakMB": 72,
+  "chromeRssPeakMB": 1230,
+  "chromeRssBaseMB": 1165,
+  "outBytes": 85311,
+  "warnings": [
+   "camera_moving",
+   "spatial_fallback",
+   "scene_in_motion"
+  ]
+ },
+ {
+  "scenario": "shot_cut",
+  "frames": 90,
+  "region": {
+   "x": 25,
+   "y": 85,
+   "w": 595,
+   "h": 230
+  },
+  "chunks": 2,
+  "chunkFrames": 60,
+  "workers": 1,
+  "estimateMs": 30194,
+  "totalMs": 15538,
+  "ms": {
+   "prepare": 31,
+   "extract": 427,
+   "track": 2294,
+   "clean": 12687,
+   "join": 54,
+   "total": 15493
+  },
+  "jsHeapPeakMB": 98,
+  "chromeRssPeakMB": 1360,
+  "chromeRssBaseMB": 1035,
+  "outBytes": 103802,
+  "warnings": [
+   "shot_cut"
+  ]
+ },
+ {
+  "scenario": "lowlight_noise",
+  "frames": 90,
+  "region": {
+   "x": 45,
+   "y": 65,
+   "w": 551,
+   "h": 250
+  },
+  "chunks": 2,
+  "chunkFrames": 60,
+  "workers": 1,
+  "estimateMs": 30317,
+  "totalMs": 23415,
+  "ms": {
+   "prepare": 36,
+   "extract": 1398,
+   "track": 2013,
+   "clean": 19852,
+   "join": 52,
+   "total": 23351
+  },
+  "jsHeapPeakMB": 94,
+  "chromeRssPeakMB": 1399,
+  "chromeRssBaseMB": 1157,
+  "outBytes": 1191841,
+  "warnings": [
+   "unreliable_motion",
+   "unreliable_motion",
+   "spatial_fallback"
+  ]
+ },
+ {
+  "scenario": "camera_pan (opt-in, degraded)",
+  "frames": 90,
+  "totalMs": 35294,
+  "ms": {
+   "prepare": 30,
+   "extract": 378,
+   "track": 1457,
+   "clean": 33338,
+   "join": 38,
+   "total": 35241
+  },
+  "jsHeapPeakMB": 115,
+  "chromeRssPeakMB": 1386,
+  "chromeRssBaseMB": 1123
+ },
+ {
+  "scenario": "occlusion (range 0-60, 3 keyframes)",
+  "frames": 60,
+  "totalMs": 6181,
+  "ms": {
+   "prepare": 28,
+   "extract": 174,
+   "track": 1068,
+   "clean": 4827,
+   "join": 39,
+   "total": 6136
+  },
+  "jsHeapPeakMB": 97,
+  "chromeRssPeakMB": 1511,
+  "chromeRssBaseMB": 1207
+ },
+ {
+  "scenario": "cancel during extract",
+  "rejectMs": 201
+ },
+ {
+  "scenario": "cancel during track",
+  "rejectMs": 100
+ },
+ {
+  "scenario": "cancel during clean",
+  "rejectMs": 151
+ }
+]

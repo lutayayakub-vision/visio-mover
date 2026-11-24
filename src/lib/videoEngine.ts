@@ -140,6 +140,26 @@ export class VideoEngine {
     return info;
   }
 
+  // ── low-level access for the video-cleanup pipeline (additive; the editor does not use these) ──
+  /** Copies the user's file into the engine's memory filesystem (read only; the File itself is never modified). */
+  async useInput(file: File): Promise<string> {
+    await this.load();
+    const ext = (file.name.split(".").pop() || "mp4").toLowerCase().replace(/[^a-z0-9]/g, "") || "mp4";
+    const name = `input.${ext}`;
+    await this.put(file, name);
+    return name;
+  }
+  /** Runs ffmpeg and returns its exit code with the log text. Throws only if the engine itself is gone. */
+  async exec(args: string[], onLine?: (line: string) => void): Promise<{ code: number; log: string }> {
+    if (!this.ff) throw new VideoError("engine_load", "The video engine is not running.");
+    this.log = []; this.onLogLine = onLine ?? null;
+    try { const code = await this.ff.exec(args); return { code, log: this.log.join("\n") }; }
+    finally { this.onLogLine = null; }
+  }
+  async writeBytes(name: string, data: Uint8Array) { if (!this.ff) throw new VideoError("engine_load", "The video engine is not running."); try { await this.ff.writeFile(name, data); } catch (e) { throw explainFailure("", e); } }
+  async readBytes(name: string): Promise<Uint8Array> { if (!this.ff) throw new VideoError("engine_load", "The video engine is not running."); return (await this.ff.readFile(name)) as Uint8Array; }
+  async removeFile(name: string) { try { await this.ff?.deleteFile(name); } catch { /* already gone */ } }
+
   async terminate() {
     this.ff?.terminate();
     this.ff = null; this.inputName = null; this.inputFile = null;

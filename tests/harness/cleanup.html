@@ -1,0 +1,40 @@
+<!doctype html><meta charset="utf-8"><title>video cleanup harness</title>
+<body><script type="module">
+  import * as V from "/src/lib/videoEngine.ts";
+  import * as C from "/src/lib/videoCleanup.ts";
+  window.V = V; window.C = C;
+  window.engine = new V.VideoEngine();
+  window.loadFile = async (path, name, type = "video/mp4") => { const b = await (await fetch("/tests/fixtures/" + path)).blob(); return new File([b], name || path.split("/").pop(), { type }); };
+  window.blobToB64 = async (blob) => { const u = new Uint8Array(await blob.arrayBuffer()); let s = ""; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000)); return btoa(s); };
+  window.sha256 = async (blobOrFile) => { const d = await crypto.subtle.digest("SHA-256", await blobOrFile.arrayBuffer()); return [...new Uint8Array(d)].map((x) => x.toString(16).padStart(2, "0")).join(""); };
+  // peak JS heap, sampled while a run is in progress
+  window.heap = { peak: 0, timer: null, start() { this.peak = 0; clearInterval(this.timer); this.timer = setInterval(() => { const m = performance.memory?.usedJSHeapSize || 0; if (m > this.peak) this.peak = m; }, 100); }, stop() { clearInterval(this.timer); return this.peak; } };
+  // one scripted run: scenario clip + ground-truth masks as keyframes; returns everything the test needs
+  window.cleanScenario = async (cfg) => { try { return await window.cleanScenario0(cfg); } catch (e) { return { ok: false, code: 'harness:' + (e.code || e.name), message: e.message, pool: null }; } };
+  window.cleanScenario0 = async (cfg) => {
+    const { name, region, keyframes, range, req = {}, opts = {}, abort, fixture, w = 640, h = 360, engine = window.engine } = cfg;
+    const f = cfg.fakeBytes ? new File([new Uint8Array(cfg.fakeBytes)], "big.mp4", { type: "video/mp4" }) : fixture ? await window.loadFile(fixture, "input.mp4") : await window.loadFile(`video-cleanup/${name}/input.mp4`, "input.mp4");
+    const shaBefore = await window.sha256(f);
+    const all = name ? new Uint8Array(await (await fetch(`/tests/out/vc-raw/${name}/mask.u8`)).arrayBuffer()) : null;
+    const info = cfg.info ?? await engine.probe(f);
+    const boxMask = (box) => { const m = new Uint8Array(info.width * info.height); for (let y = box.y; y < box.y + box.h; y++) for (let x = box.x; x < box.x + box.w; x++) m[y * info.width + x] = 1; return m; };
+    const kfs = cfg.boxKeyframes ? cfg.boxKeyframes.map((k) => ({ frame: k.frame, mask: boxMask(k.box) })) : (keyframes ?? []).map((fr) => { const m = all.slice(fr * w * h, (fr + 1) * w * h); let a = 0; for (let i = 0; i < m.length; i++) if (m[i]) a++; return a >= 60 ? { frame: fr, mask: m } : { frame: fr, absent: true }; });
+    const ac = new AbortController(); let tAbort = 0, aborted = false, pool = null; const events = [];
+    const hook = { outsideDiff: 0, insideChanged: 0, frames: 0, chunks: 0 };
+    const o = { signal: ac.signal, onProgress: (p) => { events.push([p.phase, +p.fraction.toFixed(3)]); if (abort && !aborted && p.phase === abort.phase && (abort.minFraction === undefined || p.fraction >= abort.minFraction)) { aborted = true; tAbort = performance.now(); setTimeout(() => ac.abort(), abort.afterMs || 0); } },
+      profile: opts.mobile ? { mobile: true, maxFileBytes: 30 * 1048576, maxMinutesComfortable: 2 } : undefined, limits: opts.limits,
+      debug: { ...(opts.debug || {}), onPool: (p) => { pool = p; },
+        onChunk: (c) => { hook.chunks++; if (cfg.collectRaw) { window.__raw ??= []; for (const a of c.after) window.__raw.push(a.slice()); window.__msk ??= []; for (const q of c.masks) window.__msk.push(q.slice()); } for (let i = 0; i < c.after.length; i++) { const a = c.before[i], b = c.after[i], m = c.masks[i]; hook.frames++; for (let p = 0; p < m.length; p++) { const d = a[p * 3] !== b[p * 3] || a[p * 3 + 1] !== b[p * 3 + 1] || a[p * 3 + 2] !== b[p * 3 + 2]; if (!m[p] && d) hook.outsideDiff++; if (m[p] && d) hook.insideChanged++; } } } } };
+    window.heap.start(); const t0 = performance.now(); let out;
+    try {
+      const res = await window.C.cleanupVideo(engine, f, info, { region, keyframes: kfs, range, ...req }, o);
+      out = { ok: true, b64: await window.blobToB64(res.blob), status: res.status, warnings: res.warnings, editParams: res.editParams, stats: res.stats, frames: res.frames, fps: res.fps };
+    } catch (e) { out = { ok: false, code: e.code, message: e.message, details: e.details, name: e.name }; }
+    const tEnd = performance.now();
+    out.rejectMs = aborted ? tEnd - tAbort : null; out.totalMs = tEnd - t0; out.heapPeak = window.heap.stop(); out.hook = hook;
+    out.pool = pool ? { alive: pool.alive, terminated: pool.terminated, spawned: pool.totalSpawned } : null; out.engineReady = engine.ready;
+    out.shaBefore = shaBefore; out.shaAfter = await window.sha256(f); out.events = events.length; out.info = info;
+    return out;
+  };
+  window.ready = true;
+</script></body>

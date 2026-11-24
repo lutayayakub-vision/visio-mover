@@ -97,3 +97,20 @@ Neural inpainting, server processing, audio cleanup, clips over the limits, auto
 
 ## M3 implementation note (as built)
 `src/lib/track/tracker.ts`: masked NCC template matching against the keyframe picture (colour-aware agreement check with robust brightness fit and noise-adaptive tolerance), sub-pixel refinement, forward-backward checks (previous frame and keyframe), statuses `keyframe/tracked/interpolated/reentry/uncertain/lost/absent`, re-entry search over the whole frame, manual keyframes with bidirectional tracking and straight-line interpolation (max 30 frames), camera-movement warning, `resolveMasks()` refuses while any frame needs review. Fixed (keyframe) template, no appearance adaptation: scale/rotation/shape change is flagged, not followed. Results: `tests/video-cleanup/last-m3-result.txt`, `last-m3-bench.json`. Run: `npm run test:vc-tracker`.
+
+---
+
+## Milestone 4 as-built note (pipeline)
+
+**Delivered:** `src/lib/videoCleanup.ts` (pipeline), `src/lib/inpaint/pool.ts` (worker pool), `src/lib/inpaint/temporalWorker.ts` (tracking and reconstruction in workers), additive `VideoEngine` methods (`useInput/exec/writeBytes/readBytes/removeFile`), `range` option in `temporal.ts`, `tests/video-cleanup-pipeline.test.mjs` (`npm run test:vc-pipeline`).
+
+**Deviations from §3, decided for honesty/safety:**
+- Region limit is `min(2 MP, rawBudget / (frames × 3))`: tracking needs the whole range's region frames in memory (desktop 240 MB, mobile 72 MB), so long clips need a smaller working area (refused with the exact maximum).
+- Output is the cleaned range only (not spliced into the full video). Keyframe frame numbers count from the range start.
+- Chunks are ~2 s with ≤15 context frames; a chunk is retried once with ≤45 context frames when background is insufficient or when seam pixels were filled spatially, if memory allows. Spatial-fallback seeding resets at chunk boundaries.
+- A fresh ffmpeg.wasm instance is started per job (wasm memory only grows; a reused instance failed later jobs in the suite).
+- Time model refuses > 10 min (desktop) / 6 min (mobile) projected, and a running job is stopped as `too_slow` if projected > 2× estimate and above a floor. Constants calibrated on this sandbox; real-device speed is NOT yet measured.
+
+**Bug found by the M4 tests:** reading the video in pieces with `-ss` half a frame before the target made ffmpeg duplicate a frame at the start of later pieces, putting the cleaned patch one frame late on moving footage (static_logo flicker excess 7.3 vs limit 6.1). Fixed with `-vsync 0` (excess now 1.9).
+
+**Not covered:** HDR / non-4:2:0 / non-8-bit (refused), variable-frame-rate sources beyond the frame-count check, real phones.
